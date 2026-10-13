@@ -51,8 +51,8 @@ edits) are test-first; media and UI tasks get integration tests.
 - [x] T012 [P] Implement ffprobe wrapper → SourceInfo (codec, fps, VFR detection, bit depth, colour tags, hdr_format none/hlg/hdr10/dolby_vision, rotation) and input validation (reject > 1.5 h or unsupported codec with a clear message) in src/surfclip/media/probe.py; tests on fixture clips in tests/integration/test_probe.py
 - [x] T013 [P] Implement decode pipes in src/surfclip/media/decode.py: low-fps analysis proxy (≤ 720p height, SDR; HDR tone-mapped with zscale+tonemap per research R2) yielding (frame_index, pts_s, ndarray), and full-rate window decode for [t0, t1]; timestamps from PTS
 - [x] T014 [P] Implement pool-coordinate geometry in src/surfclip/zone/geometry.py: role-ordered corners → image↔pool homography, point-in-region tests, distances in pool units and rider heights; mirror test (same scene flipped left-right gives identical pool results) in tests/unit/test_geometry.py
-- [ ] T015 Implement the stage runner with cache checks in src/surfclip/pipeline.py (stages: probe, proxy, review_copy, detect, track, epochs, zone_proposal, rides, refine, apply_edits) and logging to artifacts/<session>/pipeline.log
-- [ ] T016 [P] Implement CLI skeleton with `probe` and `ingest` (contracts/cli.md: `--artifacts`, `--config`, `--json`, exit codes 0/1/2) in src/surfclip/cli.py
+- [x] T015 Implement the stage runner with cache checks in src/surfclip/pipeline.py (stages: probe, proxy, review_copy, detect, track, epochs, zone_proposal, rides, refine, apply_edits) and logging to artifacts/<session>/pipeline.log
+- [x] T016 [P] Implement CLI skeleton with `probe` and `ingest` (contracts/cli.md: `--artifacts`, `--config`, `--json`, exit codes 0/1/2) in src/surfclip/cli.py
 
 **Checkpoint**: `surfclip probe` and `surfclip ingest` work on every sample session
 
