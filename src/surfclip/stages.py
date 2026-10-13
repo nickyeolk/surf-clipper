@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from surfclip.edits.apply import apply_edits
 from surfclip.edits.log import confirmed_zone, read_edits
 from surfclip.media.decode import Frame, iter_proxy_frames, output_size
+from surfclip.media.export import attach_exports, read_exports
 from surfclip.media.probe import probe
 from surfclip.pipeline import Pipeline, Stage, StageContext
 from surfclip.rides.assemble import assemble
@@ -172,7 +173,8 @@ class RidesStage(Stage):
             short_attempts=short,
         )
         store.write_model("rides.detected.json", detected)
-        store.write_model("rides.json", apply_edits(detected, read_edits(store)))
+        edited = apply_edits(detected, read_edits(store))
+        store.write_model("rides.json", attach_exports(edited, read_exports(store), store))
         return ["rides.detected.json", "rides.json"]
 
 

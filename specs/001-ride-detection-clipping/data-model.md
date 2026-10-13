@@ -86,7 +86,7 @@ on_wave ──(exit via frame edge)──▶ on_wave (grace ≤ frame_edge_grace
 | start_kind | `step_in` / `acid_drop` / `off_frame` / `unknown` | `off_frame`: entry wall not visible, start = first appearance; acid-drop and off-frame boundary errors reported separately |
 | state_timeline | list[(t_s, state)] | compressed run-lengths |
 | flags | {lesson, truncated, user_edited, user_added} | |
-| export | {path, cache_key, exported_at} or null | set by on-demand export |
+| export | {path, cache_key, exported_at, span} or null | set by on-demand export; kept across re-runs (exports.json) while the clip span is unchanged |
 
 `rides.json` = detected rides with edits applied. **ShortAttempt** has the same shape minus
 `export`, stored in `rides.json` under `short_attempts`.

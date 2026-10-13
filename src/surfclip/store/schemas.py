@@ -147,9 +147,10 @@ class RideFlags(_Model):
 
 
 class ExportRecord(_Model):
-    path: str
+    path: str  # relative to the session folder
     cache_key: str
     exported_at: datetime
+    span: tuple[float, float]  # clip_start_s, clip_end_s the clip was cut with
 
 
 class _RideSpan(_Model):

@@ -20,6 +20,7 @@ from surfclip.detect.errors import ModelMissingError
 from surfclip.edits.log import append_edit
 from surfclip.eval.labels import LabelError, SessionLabels, import_csv, propose
 from surfclip.eval.metrics import Span, evaluate
+from surfclip.media.export import export_rides
 from surfclip.media.probe import UnsupportedInputError, probe
 from surfclip.stages import ZoneNotConfirmedError, default_pipeline
 from surfclip.store.schemas import EditTarget, Rides, SourceInfo, StageName, Zone
@@ -200,6 +201,33 @@ def run(
     """Run the whole pipeline for VIDEO and list the rides (needs a confirmed zone)."""
     store = _run(video, "rides", artifacts, config, cpu, timings)
     _summarise(store, as_json)
+
+
+@app.command()
+def export(
+    video: Path,
+    rides: Annotated[str, typer.Option("--rides", help="Comma-separated ride ids.")] = "",
+    artifacts: ArtifactsOpt = Path("artifacts"),
+    config: ConfigOpt = DEFAULT_CONFIG_PATH,
+    cpu: CpuOpt = False,
+) -> None:
+    """Export final-quality clips for new or changed rides (HDR kept)."""
+    store = SessionStore.open(video, artifacts)
+    if not store.path("rides.json").exists():
+        raise _fail("no rides yet: run `surfclip run` first", 2)
+    cfg = load_config(config, store.session.config_overrides)
+    ids = [r.strip() for r in rides.split(",") if r.strip()] or None
+
+    def progress(i: int, n: int, rid: str) -> None:
+        typer.echo(f"  [{i}/{n}] {rid}", err=True)
+
+    try:
+        done, skipped = export_rides(store, cfg.export, ride_ids=ids, cpu=cpu, progress=progress)
+    except RuntimeError as exc:
+        raise _fail(str(exc), 1) from exc
+    typer.echo(
+        f"exported {len(done)} clips, {len(skipped)} already up to date -> {store.path('clips')}"
+    )
 
 
 models_app = typer.Typer(no_args_is_help=True, help="Manage pretrained model weights.")
