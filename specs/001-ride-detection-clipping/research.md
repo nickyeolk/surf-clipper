@@ -28,6 +28,20 @@ Not measured yet: person detection speed on the GPU (no PyTorch installed), 4K H
 Also found: `IMG_3106.MP4` (the 45°-left evaluation session) is **not present** in
 `OneDrive/Media/trifecta`; it may be online-only or moved. 13 other archive sessions are local.
 
+## T001 results (spike, in progress)
+
+Script: `scripts/spikes/t001_ffmpeg_hdr.sh` (synthetic sources only; outputs in `artifacts/spikes/t001/`).
+
+| Check | Result |
+| --- | --- |
+| (a) `zscale` and `tonemap` in WSL ffmpeg 6.1.1 | **Pass** (`tonemap_cuda` absent → tone-map on CPU; `scale_cuda` present) |
+| (c) HLG and PQ through `hevc_nvenc` main10 with explicit colour flags | **Pass**: primaries bt2020, transfer arib-std-b67 / smpte2084, matrix bt2020nc preserved. Colour flags must be passed explicitly (NVENC does not copy them). HDR10 mastering/MaxCLL metadata not yet tested (no real HDR10 sample) |
+| (b) YOLO11 throughput on RTX 2060 | Pending — needs uv + PyTorch in WSL |
+| (d) Browser seeking via HTTP Range from WSL2 | Pending — needs the backend skeleton (uv) |
+| (e) GPU inside Docker Desktop container | Pending — Docker Desktop is installed but not running |
+
+WSL tools: `uv`, `node`, `npm` missing; `docker` CLI present (from Docker Desktop).
+
 ## R1. Where the backend runs
 
 - **Decision**: Run the backend under Linux in WSL2 (Ubuntu 24.04), managed with uv, started from
