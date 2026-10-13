@@ -1,0 +1,4 @@
+# Scripts run inside WSL/Linux and must keep LF line endings
+*.sh text eol=lf
+*.py text eol=lf
+Dockerfile text eol=lf
