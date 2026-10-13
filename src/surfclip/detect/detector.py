@@ -17,6 +17,7 @@ import torch
 from numpy.typing import NDArray
 
 from surfclip.config import DetectConfig
+from surfclip.detect.errors import ModelMissingError
 from surfclip.detect.tiling import Window, merge, tile_windows, touches_inner_border
 from surfclip.media.decode import Image
 
@@ -52,11 +53,24 @@ def _use_tiles(cfg: DetectConfig, width: int, height: int) -> bool:
     return smallest_at_input < cfg.tiling_min_height_px_at_720p * cfg.imgsz / 720
 
 
+def download_model(cfg: DetectConfig) -> Path:
+    """Fetch the pretrained weights once (the only network access; never during processing)."""
+    from ultralytics import YOLO
+
+    path = Path(cfg.model)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    YOLO(str(path))  # downloads the official release asset to `path` if it is missing
+    return path
+
+
 class Detector:
     def __init__(self, cfg: DetectConfig, *, cpu: bool = False) -> None:
         from ultralytics import YOLO  # heavy import, kept local
 
-        Path(cfg.model).parent.mkdir(parents=True, exist_ok=True)
+        if not Path(cfg.model).is_file():  # FR-025: no network calls while processing
+            raise ModelMissingError(
+                f"detector weights not found at {cfg.model}: run `surfclip models download` once"
+            )
         self.cfg = cfg
         self.device = "cpu" if cpu or not torch.cuda.is_available() else "cuda:0"
         self.model: Any = YOLO(cfg.model)

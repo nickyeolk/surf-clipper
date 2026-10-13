@@ -16,7 +16,10 @@ from pydantic import ValidationError
 
 from surfclip import __version__
 from surfclip.config import DEFAULT_CONFIG_PATH, ConfigError, load_config
+from surfclip.detect.errors import ModelMissingError
 from surfclip.edits.log import append_edit
+from surfclip.eval.labels import LabelError, SessionLabels, import_csv, propose
+from surfclip.eval.metrics import Span, evaluate
 from surfclip.media.probe import UnsupportedInputError, probe
 from surfclip.stages import ZoneNotConfirmedError, default_pipeline
 from surfclip.store.schemas import EditTarget, Rides, SourceInfo, StageName, Zone
@@ -136,6 +139,7 @@ def _run(
         ConfigError,
         FileNotFoundError,
         ZoneNotConfirmedError,
+        ModelMissingError,
     ) as exc:
         raise _fail(str(exc), 2) from exc
     except Exception as exc:
@@ -196,6 +200,88 @@ def run(
     """Run the whole pipeline for VIDEO and list the rides (needs a confirmed zone)."""
     store = _run(video, "rides", artifacts, config, cpu, timings)
     _summarise(store, as_json)
+
+
+models_app = typer.Typer(no_args_is_help=True, help="Manage pretrained model weights.")
+app.add_typer(models_app, name="models")
+
+
+@models_app.command("download")
+def models_download(config: ConfigOpt = DEFAULT_CONFIG_PATH) -> None:
+    """Download the detector weights once (the tool's only network access)."""
+    from surfclip.detect.detector import download_model
+
+    path = download_model(load_config(config).detect)
+    typer.echo(f"detector weights at {path}")
+
+
+labels_app = typer.Typer(no_args_is_help=True, help="Propose and import hand labels.")
+app.add_typer(labels_app, name="labels")
+LabelsDirOpt = Annotated[Path, typer.Option("--labels-dir", help="Where label files live.")]
+
+
+@labels_app.command("propose")
+def labels_propose(
+    video: Path,
+    artifacts: ArtifactsOpt = Path("artifacts"),
+    labels_dir: LabelsDirOpt = Path("labels/rides"),
+) -> None:
+    """Write labels/rides/<video>.csv from the detected rides, for the user to validate."""
+    store = SessionStore.open(video, artifacts)
+    if not store.path("rides.json").exists():
+        raise _fail("no rides yet: run `surfclip run` first", 2)
+    out = labels_dir / f"{video.stem}.csv"
+    if out.exists():
+        raise _fail(f"{out} exists; not overwriting validated labels", 2)
+    n = propose(store.read_model("rides.json", Rides), out)
+    typer.echo(f"{n} proposed rides -> {out}")
+
+
+@labels_app.command("import")
+def labels_import(csv_file: Path, video_name: Annotated[str, typer.Option("--video")] = "") -> None:
+    """Convert a validated CSV into labels/rides/<name>.json."""
+    try:
+        labels = import_csv(csv_file, video_name or csv_file.stem)
+    except LabelError as exc:
+        raise _fail(str(exc), 2) from exc
+    out = csv_file.with_suffix(".json")
+    out.write_text(labels.model_dump_json(indent=2), encoding="utf-8")
+    typer.echo(f"{len(labels.rides)} labelled rides -> {out}")
+
+
+@app.command("eval")
+def eval_cmd(
+    video: Path,
+    artifacts: ArtifactsOpt = Path("artifacts"),
+    labels_dir: LabelsDirOpt = Path("labels/rides"),
+    as_json: JsonOpt = False,
+) -> None:
+    """Score a session's rides against its validated labels (SC-001..SC-003)."""
+    store = SessionStore.open(video, artifacts)
+    label_file = labels_dir / f"{video.stem}.json"
+    if not label_file.exists():
+        raise _fail(f"no validated labels at {label_file}", 2)
+    labels = SessionLabels.model_validate_json(label_file.read_text(encoding="utf-8"))
+    rides = store.read_model("rides.json", Rides)
+    m = evaluate(
+        [Span(r.start_s, r.end_s) for r in rides.rides],
+        labels.rides,
+        min_length_s=rides.settings.min_length_s,
+    )
+    if as_json:
+        typer.echo(json.dumps(m.__dict__, indent=2))
+        return
+    added = sum(1 for r in labels.rides if r.origin == "added")
+    typer.echo(
+        f"recall {m.recall:.1%} ({m.n_labels - len(m.missed)}/{m.n_labels}, target >= 95%)\n"
+        f"precision {m.precision:.1%} ({m.n_detected - len(m.false_rides)}/{m.n_detected}, "
+        f"target >= 90%)\n"
+        f"start error median {m.start_err_median:.2f}s p95 {m.start_err_p95:.2f}s; "
+        f"end error median {m.end_err_median:.2f}s p95 {m.end_err_p95:.2f}s "
+        f"(targets 0.5 s / 1 s)\n"
+        f"acid-drop start errors: {', '.join(f'{e:.2f}s' for e in m.acid_start_errs) or 'none'}\n"
+        f"labels added by user (tool misses): {added}"
+    )
 
 
 if __name__ == "__main__":
