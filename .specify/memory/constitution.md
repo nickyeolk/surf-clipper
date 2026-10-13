@@ -74,8 +74,8 @@ Rationale: tuning per session and per release must be traceable and reversible.
 Python 3.11+, managed with uv; typed and checked with pyright; linted and formatted with ruff;
 tested with pytest. ffmpeg handles media and MUST be HDR-aware. The pipeline is a library with a
 CLI. A local backend service exposes it to a browser UI; the UI MUST contain no pipeline logic.
-The host is the user's Windows laptop. The backend MAY run natively on Windows or in a Linux
-container under WSL2; the choice MUST be justified by a benchmark on the sample footage (decode,
+The host is the user's Windows laptop. The backend MAY run natively on Windows or under Linux in
+WSL2, directly or in a container; the choice MUST be justified by a benchmark on the sample footage (decode,
 detection and HDR export speed) and MUST NOT change pipeline behaviour.
 
 Rationale: one consistent, reproducible toolchain; the UI stays thin so the pipeline is testable
@@ -116,4 +116,4 @@ MAJOR for removing or redefining a principle, MINOR for adding a principle or ma
 expanding guidance, PATCH for clarifications. Plans and reviews MUST verify compliance; any
 deviation MUST be justified in the plan's Complexity Tracking section.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-13 | **Last Amended**: 2026-10-13
+**Version**: 1.1.1 | **Ratified**: 2026-10-13 | **Last Amended**: 2026-10-13
