@@ -84,7 +84,7 @@ edits) are test-first; media and UI tasks get integration tests.
 - [ ] T028 [US1] Implement apply-edits (rides.detected.json + edits.json → rides.json, deterministic) in src/surfclip/edits/apply.py
 - [ ] T029 [US1] Implement final clip export in src/surfclip/media/export.py: frame-accurate re-encode of `clip_start_s`..`clip_end_s`; HDR sources → hevc_nvenc main10 copying colour primaries/transfer/matrix and HDR10 mastering metadata, Dolby Vision → HLG base layer; SDR → h264_nvenc high quality; libx265/libx264 with `--cpu`; skip rides whose export cache key (boundaries + source + encoder settings) is unchanged; write clips/<ride_id>.mp4 and update `export` in rides.json
 - [ ] T030 [US1] Add CLI commands `analyse`, `rides`, `run` (with `--min-length`, `--timings`) and `export` (`--all`, `--rides`, `--cpu`) per contracts/cli.md in src/surfclip/cli.py
-- [ ] T031 [US1] Implement eval: label file format (rides with start/end, `acid_drop`, camera-shift times) and `surfclip eval SESSION --labels FILE` / `eval all --labels-dir DIR --exclude-held-out` printing per-session SC-001…SC-003 in src/surfclip/eval/metrics.py and src/surfclip/eval/cli.py; until T019 passes
+- [ ] T031 [US1] Implement eval: label file format (rides with start/end, `acid_drop`, camera-shift times, `origin: accepted | corrected | added`), `surfclip labels propose SESSION` (writes labels/<session>.json and labels/<session>.proposed.csv with every ride `status: proposed`; report counts of added/corrected rides in eval output), and `surfclip eval SESSION --labels FILE` / `eval all --labels-dir DIR --exclude-held-out` printing per-session SC-001…SC-003 in src/surfclip/eval/metrics.py and src/surfclip/eval/cli.py; until T019 passes
 - [ ] T032 [US1] Integration test for export: SDR fixture clip keeps bt709 tags; HLG and PQ synthetic sources keep their tags (ffprobe), clip duration = ride + 2.5 s padding ± 1 frame, in tests/integration/test_export.py
 - [ ] T033 [US1] Tune evidence thresholds in config/default.toml on non-held-out sessions only and record per-session SC-001…SC-003 results in specs/001-ride-detection-clipping/eval-log.md
 
@@ -238,6 +238,10 @@ Task: "ByteTrack tracking in src/surfclip/track/tracker.py"                     
 
 ## Notes
 
-- Hand labels (PRD phase P0) are needed from T031 onwards; `IMG_3106.MP4` must be made local first
+- Labels (PRD phase P0) are needed from T031 onwards. They are proposed by the tool and validated by
+  the user, including an 8× miss-scan of the whole session (research R15); `IMG_3106.MP4` must be
+  made local first
+- T059's Review screen gains a "label" mode (confirm/trim/delete proposals, add missed rides,
+  activity strip) once US4 lands
 - Never write to the sample footage folder; fixtures and outputs live under artifacts/
 - Commit after each task or logical group
