@@ -3,7 +3,7 @@
 # fractions of frame size (_frac). Never raw pixels or frame counts, except where a key says
 # "_px_at_720p" (a detector-input size, normalised to a 720p frame).
 # Bump config_version whenever a default changes; it is part of every stage cache key.
-config_version = 1
+config_version = 2
 
 [analysis]
 fps = 5                       # analysis proxy frame rate
@@ -40,9 +40,14 @@ undistort_ultrawide = "auto"  # "off" | "auto"
 
 [rides]
 confirm_window_s = 1.5
-min_lateral_speed_pool = 0.05 # pool units per second along the wave
+min_lateral_speed_pool = 0.03 # pool units per second along the wave (path length / time)
+evidence_gap_s = 0.6          # brief losses of on-wave evidence (blur, spray) do not end a ride
+wall_band_in_pool = 0.05      # a side wall's band reaches this far into the pool...
+wall_band_out_pool = 0.25     # ...and this far beyond it (feet on the wall top project outward)
+zone_margin_pool = 0.05       # tolerance around the zone's back and front edges
 acid_link_s = 1.0
-acid_link_heights = 3.0       # max distance between deck-edge end and on-wave start
+acid_link_heights = 3.0       # max distance between a side-wall track end and the on-wave start
+lesson_overlap_frac = 0.5     # ride flagged "lesson" if others are in the zone this much of it
 frame_edge_grace_s = 2.0
 min_length_s = 10.0           # user-settable before processing
 pad_before_s = 1.0

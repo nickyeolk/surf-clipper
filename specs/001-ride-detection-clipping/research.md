@@ -141,6 +141,10 @@ must stream frames to the detector in batches rather than hold a whole session i
   `config/default.toml`.
 - **Rationale**: Directly encodes the spec's FR-010…FR-018; pure Python, easy to unit-test with
   synthetic tracks.
+- **Risk to tune (T033)**: the motion rule (`min_lateral_speed_pool`, default 0.03/s) may miss a
+  beginner held almost still on a pole during a lesson. Check against the lesson at the start of
+  `20241004.MP4`; if missed, relax the rule when another person stands next to the rider (lesson)
+  rather than lowering it for everyone.
 - **Alternatives**: Learned action classifier (needs training data; violates "simple first").
 
 ## R8. Boundary refinement
