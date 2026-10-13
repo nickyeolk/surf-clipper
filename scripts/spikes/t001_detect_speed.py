@@ -21,15 +21,42 @@ PERSON, SURFBOARD = 0, 37  # COCO class ids
 
 def decode(src: str, minutes: float, fps: int) -> np.ndarray:
     probe = subprocess.run(
-        ["ffprobe", "-v", "error", "-select_streams", "v:0",
-         "-show_entries", "stream=width,height", "-of", "csv=p=0", src],
-        capture_output=True, text=True, check=True,
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=width,height",
+            "-of",
+            "csv=p=0",
+            src,
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
     )
     w, h = (int(v) for v in probe.stdout.strip().split(","))
     raw = subprocess.run(
-        ["ffmpeg", "-v", "error", "-t", str(minutes * 60), "-i", src,
-         "-vf", f"fps={fps}", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"],
-        capture_output=True, check=True,
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-t",
+            str(minutes * 60),
+            "-i",
+            src,
+            "-vf",
+            f"fps={fps}",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "bgr24",
+            "-",
+        ],
+        capture_output=True,
+        check=True,
     ).stdout
     return np.frombuffer(raw, np.uint8).reshape(-1, h, w, 3)
 
@@ -45,8 +72,9 @@ def run(model: YOLO, batches: list[list[np.ndarray]], imgsz: int) -> tuple[float
     torch.cuda.synchronize()
     start = time.perf_counter()
     for batch in batches:
-        for r in model.predict(batch, imgsz=imgsz, classes=[PERSON, SURFBOARD],
-                               conf=0.2, half=True, verbose=False):
+        for r in model.predict(
+            batch, imgsz=imgsz, classes=[PERSON, SURFBOARD], conf=0.2, half=True, verbose=False
+        ):
             n_boxes += len(r.boxes)
     torch.cuda.synchronize()
     return time.perf_counter() - start, n_boxes
@@ -60,12 +88,16 @@ def main() -> None:
     ap.add_argument("--batch", type=int, default=16)
     args = ap.parse_args()
 
-    print(f"torch {torch.__version__}, cuda {torch.cuda.is_available()}, "
-          f"{torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'cpu'}")
+    print(
+        f"torch {torch.__version__}, cuda {torch.cuda.is_available()}, "
+        f"{torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'cpu'}"
+    )
     t0 = time.perf_counter()
     frames = decode(args.source, args.minutes, fps=5)
-    print(f"decoded {len(frames)} frames {frames.shape[2]}x{frames.shape[1]} "
-          f"in {time.perf_counter() - t0:.1f}s")
+    print(
+        f"decoded {len(frames)} frames {frames.shape[2]}x{frames.shape[1]} "
+        f"in {time.perf_counter() - t0:.1f}s"
+    )
 
     model = YOLO(args.model)
     model.predict(list(frames[:2]), imgsz=640, half=True, verbose=False)  # warm-up
@@ -80,8 +112,10 @@ def main() -> None:
         ("2x2 tiles @640", [t for f in frames for t in tiles(f)], 640),
     ]:
         secs, boxes = run(model, batched(items), imgsz)
-        print(f"{label:18s} {secs:7.1f}s  {len(frames) / secs:6.1f} frames/s  "
-              f"-> {secs * scale / 60:5.1f} min per hour  ({boxes} boxes)")
+        print(
+            f"{label:18s} {secs:7.1f}s  {len(frames) / secs:6.1f} frames/s  "
+            f"-> {secs * scale / 60:5.1f} min per hour  ({boxes} boxes)"
+        )
 
 
 if __name__ == "__main__":

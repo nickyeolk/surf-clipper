@@ -74,7 +74,14 @@ must stream frames to the detector in batches rather than hold a whole session i
 - **Alternatives**: PyAV (finer control, but extra build dependency; keep as an option for exact
   frame seeking if pipes prove imprecise); OpenCV VideoCapture (no HDR handling, weak seeking).
 - **Verify in T001**: Ubuntu's ffmpeg build includes `zscale` (libzimg); otherwise use a static
-  ffmpeg build.
+  ffmpeg build. (Confirmed.)
+- **Found in T013 (2026-10-13)**: frame times must come from ffmpeg, never be inferred. On the
+  iPhone archive files the `fps` filter relabels frames onto its own grid and keeps the last
+  source frame per slot, so a frame reported at 600.000 s was really shot at 600.067 s (2 source
+  frames late). The proxy therefore uses `select` (keeps real frames about every 1/fps s) with
+  `-copyts`, and every frame's time is read from the `showinfo` filter. Proxy and full-rate
+  window frames now match exactly at the same timestamp. Decode cost: 2.4 min per hour (was
+  1.9 min with `fps`).
 
 ## R3. Person and board detection
 
