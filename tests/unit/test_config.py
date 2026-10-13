@@ -39,6 +39,12 @@ def test_server_must_stay_on_loopback() -> None:
         load_config(DEFAULT, {"server.host": "0.0.0.0"})
 
 
+def test_section_hash_ignores_config_version() -> None:
+    a = load_config(DEFAULT)
+    b = a.model_copy(update={"config_version": a.config_version + 1})
+    assert a.section_hash("detect") == b.section_hash("detect")
+
+
 def test_section_hash_changes_only_with_that_section() -> None:
     a = load_config(DEFAULT)
     b = load_config(DEFAULT, {"rides.min_length_s": 12})

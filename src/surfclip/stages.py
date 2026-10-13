@@ -23,6 +23,7 @@ from surfclip.pipeline import Pipeline, Stage, StageContext
 from surfclip.rides.assemble import assemble
 from surfclip.rides.evidence import Evidence, Obs, classify
 from surfclip.rides.state_machine import TrackRide, track_rides
+from surfclip.rides.stitch import stitch
 from surfclip.store.frames import (
     FrameMeta,
     read_detections,
@@ -137,7 +138,7 @@ class RidesStage(Stage):
     name: StageName = "rides"
     depends_on: tuple[StageName, ...] = ("track",)
     config_sections: tuple[str, ...] = ("rides",)
-    code_version: str = "1"
+    code_version: str = "2"  # 2: stitch track fragments; lesson = anyone else in the zone
 
     def extra_inputs(self, store: SessionStore) -> list[str]:
         # The confirmed zone and every ride edit change rides.json; this stage is cheap.
@@ -154,13 +155,18 @@ class RidesStage(Stage):
         by_track: dict[int, list[Obs]] = defaultdict(list)
         for o in read_observations(store.path("tracks.parquet")):
             by_track[o.track_id].append(o)
+        chains, members = stitch(list(by_track.values()), cfg)
         evidence: dict[int, list[Evidence]] = {
-            tid: classify(obs, zone, cfg) for tid, obs in by_track.items()
+            cid: classify(obs, zone, cfg) for cid, obs in chains.items()
         }
         trs: list[TrackRide] = [r for evs in evidence.values() for r in track_rides(evs, cfg)[1]]
         rides, short = assemble(
             trs, evidence, cfg=cfg, fps=info.avg_fps, duration_s=info.duration_s
         )
+        rides = [  # report the tracker's own fragment ids, not chain ids
+            r.model_copy(update={"track_ids": [t for c in r.track_ids for t in members[c]]})
+            for r in rides
+        ]
         detected = Rides(
             session_id=store.session.session_id,
             source=SourceSummary(path=info.path, fps=info.avg_fps, hdr_format=info.hdr_format),

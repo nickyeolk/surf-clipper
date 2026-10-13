@@ -2,8 +2,9 @@
 # Units: seconds (_s), pool units (_pool, 0-1 across/along the wave), rider heights (_heights),
 # fractions of frame size (_frac). Never raw pixels or frame counts, except where a key says
 # "_px_at_720p" (a detector-input size, normalised to a 720p frame).
-# Bump config_version whenever a default changes; it is part of every stage cache key.
-config_version = 3
+# Bump config_version whenever a default changes (informational). Stage cache keys use only the
+# sections each stage reads, so changing a ride threshold never re-runs detection.
+config_version = 4
 
 [analysis]
 fps = 5                       # analysis proxy frame rate
@@ -56,6 +57,9 @@ zone_margin_pool = 0.05       # tolerance around the zone's back and front edges
 acid_link_s = 1.0
 acid_link_heights = 3.0       # max distance between a side-wall track end and the on-wave start
 lesson_overlap_frac = 0.5     # ride flagged "lesson" if others are in the zone this much of it
+stitch_gap_s = 1.5            # join track fragments of one person across gaps up to this long
+stitch_base_heights = 1.5     # ...when the next fragment starts within this many rider heights
+stitch_heights_per_s = 3.0    # ...plus this much per second of gap (riders move fast)
 frame_edge_grace_s = 2.0
 min_length_s = 10.0           # user-settable before processing
 pad_before_s = 1.0

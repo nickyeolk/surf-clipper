@@ -78,12 +78,21 @@ def test_lesson_flag_when_instructor_stands_in_zone() -> None:
     assert rides[0].flags.lesson
 
 
+def test_group_lesson_on_a_pole_flags_every_beginner() -> None:
+    first = track(1, 0.0, ride_segment(15.0, 0.2, 0.7))
+    second = track(2, 0.0, ride_segment(15.0, 0.3, 0.8, v=0.5))
+    rides, _ = _assemble(first, second)
+    assert len(rides) == 2
+    assert all(r.flags.lesson for r in rides)
+
+
 def test_changeover_overlap_gives_two_rides() -> None:
     first = track(1, 0.0, ride_segment(20.0, 0.2, 0.8))
     second = track(2, 19.0, ride_segment(15.0, 0.1, 0.6))
     rides, _ = _assemble(first, second)
     assert len(rides) == 2
     assert rides[0].end_s > rides[1].start_s
+    assert not any(r.flags.lesson for r in rides)  # a 1 s overlap is a changeover, not a lesson
 
 
 def test_padding_frames_and_ids() -> None:

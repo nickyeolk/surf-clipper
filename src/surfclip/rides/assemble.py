@@ -5,8 +5,9 @@
   at the jump. The tracker often loses a fast, blurred drop-in.
 * Frame-edge returns: a ride that leaves through a frame edge and comes back through the same edge
   within ``frame_edge_grace_s`` continues as one ride.
-* Lessons: a ride is flagged when other people stand in the zone without riding (an instructor)
-  for at least ``lesson_overlap_frac`` of it.
+* Lessons: a ride is flagged when other people are in the zone (an instructor in the water, or
+  other beginners holding the same pole, as on 20241004) for at least ``lesson_overlap_frac`` of
+  it. A changeover overlap of a second or two is not a lesson.
 * Rides shorter than ``min_length_s`` become short attempts. Clips get padding, clamped to the
   video.
 """
@@ -108,7 +109,8 @@ def _lesson(d: _Draft, evidence: Mapping[int, Sequence[Evidence]], cfg: RidesCon
         for tid, evs in evidence.items()
         if tid not in d.track_ids
         for ev in evs
-        if d.start_t <= ev.t <= d.end_t and ev.region == "zone" and not ev.candidate
+        # Anyone else in the zone: an instructor in the water, or other beginners on the pole.
+        if d.start_t <= ev.t <= d.end_t and ev.region == "zone"
     }
     if not times:
         return False

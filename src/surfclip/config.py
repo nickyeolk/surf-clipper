@@ -82,6 +82,9 @@ class RidesConfig(_Section):
     acid_link_s: float
     acid_link_heights: float
     lesson_overlap_frac: float
+    stitch_gap_s: float
+    stitch_base_heights: float
+    stitch_heights_per_s: float
     frame_edge_grace_s: float
     min_length_s: float
     pad_before_s: float
@@ -129,12 +132,14 @@ class Config(_Section):
     server: ServerConfig
 
     def section_hash(self, section: str) -> str:
-        """Stable hash of one section plus config_version, for stage cache keys."""
+        """Stable hash of one section's values, for stage cache keys.
+
+        Only the section's own values count: a change to ride thresholds must never re-run
+        detection (FR-023). ``config_version`` is informational and deliberately left out.
+        """
         part = getattr(self, section)
         assert isinstance(part, BaseModel)
-        payload = json.dumps(
-            {"v": self.config_version, section: part.model_dump(mode="json")}, sort_keys=True
-        )
+        payload = json.dumps({section: part.model_dump(mode="json")}, sort_keys=True)
         return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
