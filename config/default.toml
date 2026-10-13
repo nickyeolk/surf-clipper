@@ -3,7 +3,7 @@
 # fractions of frame size (_frac). Never raw pixels or frame counts, except where a key says
 # "_px_at_720p" (a detector-input size, normalised to a 720p frame).
 # Bump config_version whenever a default changes; it is part of every stage cache key.
-config_version = 2
+config_version = 3
 
 [analysis]
 fps = 5                       # analysis proxy frame rate
@@ -11,18 +11,26 @@ max_height = 720              # proxy is downscaled to at most this height
 tonemap = "hable"             # HDR -> SDR operator for analysis frames
 
 [detect]
-model = "yolo11s.pt"
+model = "artifacts/models/yolo11s.pt"  # downloaded on first use; artifacts/ is gitignored
 confidence = 0.2
 classes = ["person", "surfboard"]
 half_precision = true
 batch_size = 16
-tiling = "auto"               # "off" | "auto" | "always"
-tiling_min_height_px_at_720p = 60   # tile when expected rider height drops below this
+tiling = "always"             # "off" | "auto" | "always"; T001: 2x2 tiles cost 6.7 min/h and
+                              # find ~47% more boxes than full frame at 640 px
+tiling_min_height_px_at_720p = 60   # "auto": tile when expected rider height drops below this
+imgsz = 640                   # detector input size per tile (or per frame without tiling)
+nms_iou = 0.5                 # merge duplicate boxes from overlapping tiles
 tile_overlap_frac = 0.2
 
 [track]
 max_gap_s = 1.0               # keep a track alive through detection gaps up to this long
 min_track_s = 0.6
+match_iou = 0.8               # ByteTrack matching threshold
+edge_margin_frac = 0.005      # box within this fraction of the frame size of an edge = touching it
+sitting_max_aspect = 0.9      # box height/width below this = sitting or lying
+crouched_max_aspect = 1.4     # below this = crouched, above = standing
+board_reach_heights = 0.35    # board centre within this many box heights of the feet = on board
 
 [epochs]
 match_fps = 1

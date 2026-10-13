@@ -91,7 +91,7 @@ on_wave ──(exit via frame edge)──▶ on_wave (grace ≤ frame_edge_grace
 `rides.json` = detected rides with edits applied. **ShortAttempt** has the same shape minus
 `export`, stored in `rides.json` under `short_attempts`.
 
-Validation: `end > start`; rides ≥ `min_length_s` unless `user_added`; overlap allowed only as a
+Validation: `end > start`; rides ≥ `min_length_s` unless `user_added` or `user_edited`; overlap allowed only as a
 changeover (≤ `changeover_overlap_max_s`).
 
 ## UserEdit (`edits.json`, append-only)

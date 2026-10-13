@@ -34,6 +34,10 @@ class Stage(ABC):
     def run(self, ctx: StageContext) -> list[str]:
         """Do the work; return output file names relative to the session folder."""
 
+    def extra_inputs(self, store: SessionStore) -> list[str]:
+        """Inputs beyond upstream stages and config, e.g. a confirmed zone (part of the key)."""
+        return []
+
 
 @dataclass
 class RunReport:
@@ -74,7 +78,8 @@ class Pipeline:
         for stage in self.stages:
             key = cache_key(
                 stage.name,
-                inputs=[f"{d}:{keys[d]}" for d in stage.depends_on] + [store.session.source_path],
+                inputs=[f"{d}:{keys[d]}" for d in stage.depends_on]
+                + [store.session.source_path, *stage.extra_inputs(store)],
                 config_hashes=[config.section_hash(s) for s in stage.config_sections],
                 code_version=stage.code_version,
             )

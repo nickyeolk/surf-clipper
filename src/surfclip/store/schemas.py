@@ -216,9 +216,10 @@ class Rides(_Versioned):
 
     @model_validator(mode="after")
     def _min_length_unless_user_added(self) -> Rides:
-        """Rides >= min_length_s unless user_added (data-model.md)."""
+        """Rides >= min_length_s unless the user added or edited them (data-model.md)."""
         for ride in self.rides:
-            if ride.length_s < self.settings.min_length_s and not ride.flags.user_added:
+            user_made = ride.flags.user_added or ride.flags.user_edited
+            if ride.length_s < self.settings.min_length_s and not user_made:
                 raise ValueError(
                     f"{ride.ride_id}: {ride.length_s:.2f}s is shorter than min_length_s "
                     f"{self.settings.min_length_s}s and not user_added"

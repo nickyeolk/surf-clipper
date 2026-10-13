@@ -42,11 +42,18 @@ class DetectConfig(_Section):
     tiling: Literal["off", "auto", "always"]
     tiling_min_height_px_at_720p: int
     tile_overlap_frac: float
+    imgsz: int
+    nms_iou: float
 
 
 class TrackConfig(_Section):
     max_gap_s: float
     min_track_s: float
+    match_iou: float
+    edge_margin_frac: float
+    sitting_max_aspect: float
+    crouched_max_aspect: float
+    board_reach_heights: float
 
 
 class EpochsConfig(_Section):

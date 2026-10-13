@@ -7,17 +7,21 @@ output to stdout; human messages and logs go to stderr.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Annotated
 
 import typer
+from pydantic import ValidationError
 
 from surfclip import __version__
 from surfclip.config import DEFAULT_CONFIG_PATH, ConfigError, load_config
+from surfclip.edits.log import append_edit
 from surfclip.media.probe import UnsupportedInputError, probe
-from surfclip.stages import default_pipeline
-from surfclip.store.schemas import SourceInfo
+from surfclip.stages import ZoneNotConfirmedError, default_pipeline
+from surfclip.store.schemas import EditTarget, Rides, SourceInfo, StageName, Zone
 from surfclip.store.session import SessionStore, SourceLocationError
+from surfclip.zone.geometry import GeometryError, PoolMapping
 
 app = typer.Typer(no_args_is_help=True, help="Surf Session Clipper", add_completion=False)
 
@@ -92,6 +96,106 @@ def ingest(
     else:
         typer.echo(f"session {store.session.session_id} -> {store.root}", err=True)
         typer.echo(_describe(info))
+
+
+@app.command()
+def zone(
+    video: Path,
+    from_file: Annotated[Path, typer.Option("--from-file", help="Zone JSON to confirm.")],
+    epoch: Annotated[int, typer.Option("--epoch", help="Camera epoch.")] = 0,
+    artifacts: ArtifactsOpt = Path("artifacts"),
+) -> None:
+    """Confirm the wave zone for VIDEO from a file (until the zone editor exists)."""
+    try:
+        store = SessionStore.open(video, artifacts)
+        z = Zone.model_validate_json(from_file.read_text(encoding="utf-8"))
+        z = z.model_copy(update={"epoch_id": epoch, "origin": "user"})
+        PoolMapping.from_corners(z.corners)
+    except (SourceLocationError, FileNotFoundError, ValidationError, GeometryError) as exc:
+        raise _fail(str(exc), 2) from exc
+    edit = append_edit(
+        store,
+        "confirm_zone",
+        EditTarget(epoch_id=epoch),
+        {"zone": z.model_dump(mode="json"), "how": "file"},
+    )
+    typer.echo(f"zone confirmed for epoch {epoch} (edit {edit.edit_id})")
+
+
+def _run(
+    video: Path, until: StageName, artifacts: Path, config: Path, cpu: bool, timings: bool
+) -> SessionStore:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    try:
+        store = SessionStore.open(video, artifacts)
+        cfg = load_config(config, store.session.config_overrides)
+        report = default_pipeline(cpu=cpu).run(store, cfg, until=until)
+    except (
+        UnsupportedInputError,
+        SourceLocationError,
+        ConfigError,
+        FileNotFoundError,
+        ZoneNotConfirmedError,
+    ) as exc:
+        raise _fail(str(exc), 2) from exc
+    except Exception as exc:
+        raise _fail(f"{type(exc).__name__}: {exc}", 1) from exc
+    if timings:
+        for stage in report.cache_hits:
+            typer.echo(f"  {stage:8s} cached", err=True)
+        for stage, secs in report.seconds.items():
+            typer.echo(f"  {stage:8s} {secs / 60:6.1f} min", err=True)
+    return store
+
+
+def _summarise(store: SessionStore, as_json: bool) -> None:
+    rides = store.read_model("rides.json", Rides)
+    if as_json:
+        typer.echo(rides.model_dump_json(indent=2))
+        return
+    typer.echo(f"{len(rides.rides)} rides, {len(rides.short_attempts)} short attempts")
+    for r in rides.rides:
+        flags = [k for k, v in r.flags.model_dump().items() if v]
+        typer.echo(
+            f"  {r.ride_id}  {_clock(r.start_s)}-{_clock(r.end_s)}  {r.length_s:5.1f}s  "
+            f"conf {r.confidence:.2f}  {r.start_kind:9s} {' '.join(flags)}"
+        )
+
+
+def _clock(seconds: float) -> str:
+    m, s = divmod(seconds, 60)
+    return f"{int(m):02d}:{s:05.2f}"
+
+
+CpuOpt = Annotated[bool, typer.Option("--cpu", help="Run detection on the CPU.")]
+TimingsOpt = Annotated[bool, typer.Option("--timings", help="Print stage timings.")]
+
+
+@app.command()
+def analyse(
+    video: Path,
+    artifacts: ArtifactsOpt = Path("artifacts"),
+    config: ConfigOpt = DEFAULT_CONFIG_PATH,
+    cpu: CpuOpt = False,
+    timings: TimingsOpt = False,
+) -> None:
+    """Detect and track people in VIDEO (the slow part; cached afterwards)."""
+    _run(video, "track", artifacts, config, cpu, timings)
+    typer.echo("analysis done")
+
+
+@app.command()
+def run(
+    video: Path,
+    artifacts: ArtifactsOpt = Path("artifacts"),
+    config: ConfigOpt = DEFAULT_CONFIG_PATH,
+    cpu: CpuOpt = False,
+    timings: TimingsOpt = False,
+    as_json: JsonOpt = False,
+) -> None:
+    """Run the whole pipeline for VIDEO and list the rides (needs a confirmed zone)."""
+    store = _run(video, "rides", artifacts, config, cpu, timings)
+    _summarise(store, as_json)
 
 
 if __name__ == "__main__":
