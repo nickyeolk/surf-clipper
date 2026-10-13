@@ -1,0 +1,18 @@
+# Session outputs (review copies, stage files, clips) - large and per-machine
+artifacts/
+
+# Media never belongs in the repo
+*.mp4
+*.MP4
+*.mov
+*.MOV
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Claude Code local settings (skills in .claude/skills are committed)
+.claude/settings.local.json
