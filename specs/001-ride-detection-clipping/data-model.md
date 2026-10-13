@@ -2,7 +2,8 @@
 
 All times are stored as seconds (float, from the source's presentation timestamps) **and** source
 frame indices. All positions used for decisions are in pool coordinates `(u, v)` in [0,1]², where
-`u` runs along the wave (between the wave ends) and `v` runs from the deck edge (`v=0`) towards the
+`u` runs along the wave (from side wall `a` at `u=0` to side wall `b` at `u=1`; riders enter over
+the side walls) and `v` runs from the back wall (`v=0`) towards the
 camera. Image-space values are kept only for display. Every file carries `schema_version`.
 
 ## Session
@@ -42,9 +43,9 @@ Validation: reject before processing if duration > 1.5 h or codec unsupported (s
 | Field | Type | Notes |
 | --- | --- | --- |
 | epoch_id | int | |
-| corners | {deck_a, deck_b, wave_end_a, wave_end_b} → image point | ordered by role, never by image side |
-| deck_boundary | polyline (image) | far edge of the water |
-| entrance, side_areas | list of polygons (pool coords) | |
+| corners | {back_a, back_b, front_a, front_b} → image point | by role, never by image side; may lie outside the frame. Side wall `a` = back_a→front_a, `b` = back_b→front_b |
+| entry_walls | subset of {side_a, side_b} | walls riders drop in from; default both (riders never enter over the back wall) |
+| side_areas | list of polygons (image px) | where people wait on the side walls/decks |
 | image_to_pool | 3×3 | derived from corners |
 | undistort | params or null | ultra-wide correction (*should*) |
 | origin | `proposed` / `auto_remap` | how the candidate was produced |
@@ -58,8 +59,8 @@ Per analysis frame (5 fps) and refinement window (full rate):
 frame, t_s, track_id, class (person/surfboard), bbox (image), score, truncated_edge (none/left/
 right/top/bottom), feet_point (image + pool), feet_estimated (bool), box_height_px.
 
-Per track per frame (derived): state (`off` / `dropping_in` / `on_wave`), region (`deck`,
-`entrance`, `side`, `water`, `zone`), board_contact (bool), stance (`standing`, `crouched`,
+Per track per frame (derived): state (`off` / `dropping_in` / `on_wave`), region (`side_wall`
+(on or beside an entry wall), `side_area`, `zone`, `outside`), at_frame_edge (which edge, if any), board_contact (bool), stance (`standing`, `crouched`,
 `sitting`, `unknown`), lateral_speed (pool units/s).
 
 State transitions (per track):
@@ -68,7 +69,7 @@ State transitions (per track):
 off ──(feet cross into water, standing, on board)──▶ dropping_in
 dropping_in ──(on-wave evidence held ≥ confirm_window_s)──▶ on_wave   [start back-dated]
 dropping_in ──(evidence lost)──▶ off                                   [no ride]
-on_wave ──(fall / exit to side or deck / leave zone)──▶ off            [ride ends at last on_wave frame]
+on_wave ──(fall / exit over a side wall / leave zone)──▶ off           [ride ends at last on_wave frame]
 on_wave ──(exit via frame edge)──▶ on_wave (grace ≤ frame_edge_grace_s) ──▶ off if not back
 ```
 
@@ -82,7 +83,7 @@ on_wave ──(exit via frame edge)──▶ on_wave (grace ≤ frame_edge_grace
 | confidence | float [0,1] | sorts the review list (lowest first) |
 | epochs | list[int] | more than one if it spans a camera move |
 | track_ids | list[int] | joined tracks (acid drop, edge exit, epoch join) |
-| start_kind | `entrance` / `acid_drop` / `unknown` | acid-drop boundary error reported separately |
+| start_kind | `step_in` / `acid_drop` / `off_frame` / `unknown` | `off_frame`: entry wall not visible, start = first appearance; acid-drop and off-frame boundary errors reported separately |
 | state_timeline | list[(t_s, state)] | compressed run-lengths |
 | flags | {lesson, truncated, user_edited, user_added} | |
 | export | {path, cache_key, exported_at} or null | set by on-demand export |

@@ -26,10 +26,10 @@ uv run pytest tests/integration
 uv run surfclip serve         # open http://localhost:8765
 ```
 
-1. Add `20250326_1.MP4` (head-on, night LED). Expect a progress bar, then a keyframe with a
-   proposed zone (corners, deck line, entrance and side areas).
+1. Add `20260928_IMG_1652.MOV` (portrait, night). Expect a progress bar, then a keyframe with a
+   proposed zone (corners, possibly off-frame; entry side walls; side waiting areas).
 2. Accept the zone (time it: ≤ 30 s, SC-004). Expect rides to appear, lowest confidence first.
-3. Check: no ride for people sitting at the entrance; short attempts listed separately; any
+3. Check: no ride for people sitting on the side walls; short attempts listed separately; any
    lesson rides flagged.
 
 ## Scenario 2 — review and edits survive re-runs (US4)

@@ -105,20 +105,27 @@ class Epochs(_Versioned):
 
 
 class ZoneCorners(_Model):
-    """Corners by role, never by image side (constitution III)."""
+    """Image positions of the wave zone's corners, by role (constitution III).
 
-    deck_a: Point
-    deck_b: Point
-    wave_end_a: Point
-    wave_end_b: Point
+    ``back_*`` are the two ends of the back wall; ``front_*`` the front ends of the side walls.
+    Side wall ``a`` runs back_a -> front_a, side wall ``b`` runs back_b -> front_b. Which side
+    is ``a`` is arbitrary, never tied to image left or right. Corners may lie outside the frame.
+    """
+
+    back_a: Point
+    back_b: Point
+    front_a: Point
+    front_b: Point
+
+
+SideWall = Literal["side_a", "side_b"]
 
 
 class Zone(_Model):
     epoch_id: int
     corners: ZoneCorners
-    deck_boundary: list[Point]
-    entrance: list[list[Point]] = Field(default_factory=list[list[Point]])
-    side_areas: list[list[Point]] = Field(default_factory=list[list[Point]])
+    entry_walls: list[SideWall] = Field(default_factory=lambda: ["side_a", "side_b"])
+    side_areas: list[list[Point]] = Field(default_factory=list[list[Point]])  # waiting, image px
     image_to_pool: Matrix3 | None = None
     undistort: dict[str, float] | None = None
     origin: Literal["proposed", "auto_remap", "user"]
@@ -165,7 +172,7 @@ class Ride(_RideSpan):
     clip_end_s: float
     epochs: list[int]
     track_ids: list[int]
-    start_kind: Literal["entrance", "acid_drop", "unknown"] = "unknown"
+    start_kind: Literal["step_in", "acid_drop", "off_frame", "unknown"] = "unknown"
     state_timeline: list[tuple[float, RideState]] = Field(
         default_factory=list[tuple[float, RideState]]
     )

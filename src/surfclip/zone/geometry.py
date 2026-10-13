@@ -2,8 +2,9 @@
 
 Positions used for decisions are in a top-down pool plane ``(u, v)`` in [0, 1]^2:
 
-* ``u`` runs along the wave, from the ``*_a`` corners (u=0) to the ``*_b`` corners (u=1);
-* ``v`` runs from the deck edge (v=0) towards the camera side of the wave (v=1).
+* ``u`` runs along the wave, from side wall ``a`` (u=0) to side wall ``b`` (u=1); riders enter
+  over the side walls and ride along ``u``;
+* ``v`` runs from the back wall (v=0) to the front of the zone (v=1).
 
 Corners are identified by role, never by image left/right, so filming from the other side
 of the wave gives the same pool coordinates for the same physical point.
@@ -39,12 +40,12 @@ def _segments_cross(p1: FloatArray, p2: FloatArray, q1: FloatArray, q2: FloatArr
 
 
 def _check_quad(quad: FloatArray) -> None:
-    """Quad in pool order (deck_a, deck_b, wave_end_b, wave_end_a) must be a simple polygon."""
+    """Quad in pool order (back_a, back_b, front_b, front_a) must be a simple polygon."""
     # Crossing first: a symmetric bowtie also has zero signed area.
     if _segments_cross(quad[0], quad[1], quad[2], quad[3]) or _segments_cross(
         quad[1], quad[2], quad[3], quad[0]
     ):
-        raise GeometryError("zone edges cross: check which corner is which (deck vs wave end)")
+        raise GeometryError("zone edges cross: check which corner is which (back vs front)")
     x, y = quad[:, 0], quad[:, 1]
     area = 0.5 * abs(float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1))))
     span = float(np.ptp(quad, axis=0).max())
@@ -79,7 +80,7 @@ class PoolMapping:
     @classmethod
     def from_corners(cls, corners: ZoneCorners) -> PoolMapping:
         quad = np.array(
-            [corners.deck_a, corners.deck_b, corners.wave_end_b, corners.wave_end_a],
+            [corners.back_a, corners.back_b, corners.front_b, corners.front_a],
             dtype=np.float64,
         )
         _check_quad(quad)

@@ -9,17 +9,13 @@ from surfclip.zone.geometry import (
     point_in_polygon,
 )
 
-# Oblique view: far deck edge short and high in the image, near wave edge long and low.
-OBLIQUE = ZoneCorners(
-    deck_a=(400, 200), deck_b=(900, 220), wave_end_a=(100, 650), wave_end_b=(1200, 700)
-)
+# Oblique view: back wall short and high in the image, front of the zone long and low.
+OBLIQUE = ZoneCorners(back_a=(400, 200), back_b=(900, 220), front_a=(100, 650), front_b=(1200, 700))
 
 
 def test_corners_map_to_unit_square_by_role() -> None:
     m = PoolMapping.from_corners(OBLIQUE)
-    got = m.to_pool(
-        np.array([OBLIQUE.deck_a, OBLIQUE.deck_b, OBLIQUE.wave_end_b, OBLIQUE.wave_end_a])
-    )
+    got = m.to_pool(np.array([OBLIQUE.back_a, OBLIQUE.back_b, OBLIQUE.front_b, OBLIQUE.front_a]))
     assert np.allclose(got, [(0, 0), (1, 0), (1, 1), (0, 1)], atol=1e-9)
 
 
@@ -30,7 +26,7 @@ def test_round_trip_image_pool_image() -> None:
 
 
 def test_perspective_far_side_pixels_cover_more_pool() -> None:
-    """The same 50 px step is a bigger pool distance near the (far) deck than near the camera."""
+    """The same 50 px step is a bigger pool distance near the back wall than near the camera."""
     m = PoolMapping.from_corners(OBLIQUE)
     far = m.to_pool(np.array([(600, 230), (650, 230)]))
     near = m.to_pool(np.array([(600, 650), (650, 650)]))
@@ -43,10 +39,10 @@ def test_mirror_invariance() -> None:
     width = 1280
     flip = lambda p: (width - p[0], p[1])  # noqa: E731
     mirrored = ZoneCorners(
-        deck_a=flip(OBLIQUE.deck_a),
-        deck_b=flip(OBLIQUE.deck_b),
-        wave_end_a=flip(OBLIQUE.wave_end_a),
-        wave_end_b=flip(OBLIQUE.wave_end_b),
+        back_a=flip(OBLIQUE.back_a),
+        back_b=flip(OBLIQUE.back_b),
+        front_a=flip(OBLIQUE.front_a),
+        front_b=flip(OBLIQUE.front_b),
     )
     pts = [(500.0, 400.0), (650.0, 300.0), (1000.0, 600.0)]
     a = PoolMapping.from_corners(OBLIQUE).to_pool(np.array(pts))
@@ -55,15 +51,13 @@ def test_mirror_invariance() -> None:
 
 
 def test_degenerate_corners_are_rejected() -> None:
-    collinear = ZoneCorners(
-        deck_a=(0, 0), deck_b=(100, 0), wave_end_a=(200, 0), wave_end_b=(300, 0)
-    )
+    collinear = ZoneCorners(back_a=(0, 0), back_b=(100, 0), front_a=(200, 0), front_b=(300, 0))
     with pytest.raises(GeometryError):
         PoolMapping.from_corners(collinear)
 
 
 def test_self_intersecting_corners_are_rejected() -> None:
-    bowtie = ZoneCorners(deck_a=(0, 0), deck_b=(100, 0), wave_end_a=(100, 100), wave_end_b=(0, 100))
+    bowtie = ZoneCorners(back_a=(0, 0), back_b=(100, 0), front_a=(100, 100), front_b=(0, 100))
     with pytest.raises(GeometryError, match="cross"):
         PoolMapping.from_corners(bowtie)
 

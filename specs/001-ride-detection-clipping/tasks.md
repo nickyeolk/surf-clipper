@@ -34,7 +34,7 @@ edits) are test-first; media and UI tasks get integration tests.
 - [x] T004 [P] Configure ruff and pyright (strict for src/surfclip) in pyproject.toml; add a `pytest` marker `integration` that requires artifacts/fixtures/
 - [x] T005 [P] Initialise web/ with Vite + Svelte 5 + TypeScript (web/package.json, web/vite.config.ts with dev proxy `/api` → `http://127.0.0.1:8765`, build output web/dist/)
 - [x] T006 [P] Write config/default.toml with every key listed in data-model.md "Config" (incl. `rides.confirm_window_s = 1.5`, `rides.acid_link_s = 1.0`, `rides.frame_edge_grace_s = 2.0`, `rides.min_length_s = 10`, `rides.pad_before_s = 1.0`, `rides.pad_after_s = 1.5`, `rides.refine_window_s = 2.0`, `analysis.fps = 5`, `server.host = "127.0.0.1"`, `server.port = 8765`) and a `config_version`
-- [ ] T007 [P] Write scripts/make_fixtures.py: cut short fixture clips (stream copy, never writing to the source folder) from the sample sessions into artifacts/fixtures/ — an acid drop, an entrance sitter, a lesson segment from `20241004.MP4`, a near-edge truncated ride, a night LED ride from `20250326_1.MP4`, and a 3 min multi-ride stretch; list chosen timestamps in scripts/fixtures.toml
+- [ ] T007 [P] Write scripts/make_fixtures.py: cut short fixture clips (stream copy, never writing to the source folder) from the sample sessions into artifacts/fixtures/ — an acid drop from a side wall, a side-wall sitter, a lesson segment from `20241004.MP4`, a near-edge truncated ride, an off-frame entry and a portrait night ride from `20260928_IMG_1652.MOV`, a blurred HDR ride from `20261012_110549566.mp4`, and a 3 min multi-ride stretch from `20240924.MP4`; list chosen timestamps in scripts/fixtures.toml
 
 ---
 
@@ -62,13 +62,13 @@ edits) are test-first; media and UI tasks get integration tests.
 
 **Goal**: Ride list + final-quality clips for a session whose zone is provided as a file
 
-**Independent Test**: With a hand-made zone file for `20250326_1.MP4` and `20241004.MP4`, run
+**Independent Test**: With hand-made zone files for the four evaluation sessions (`20260928_IMG_1652`, `20240924`, `20241004`, `20261012_110549566`), run
 `surfclip run`, compare `rides.json` with hand labels via `surfclip eval`, and play exported clips
 
 ### Tests for User Story 1 ⚠️ (write first, must fail)
 
-- [ ] T017 [P] [US1] State-machine unit tests with synthetic tracks in tests/unit/test_state_machine.py: entrance sitter overlapping the zone in the image stays `off`; person in water without board stays `off`; ride confirmed after 1.5 s and start back-dated to boundary crossing; fall ends ride on last on-wave frame; changeover overlap gives two rides
-- [ ] T018 [P] [US1] Ride-joining unit tests in tests/unit/test_joining.py: acid-drop link (deck-edge track end + on-wave track start within 1 s and N rider heights) starts at the jump; same-edge frame-edge exit and return within 2 s is one ride; return after 2.5 s is two rides; ride < `min_length_s` becomes a short attempt; lesson stretch → only the person on a board rides, flagged `lesson`
+- [ ] T017 [P] [US1] State-machine unit tests with synthetic tracks in tests/unit/test_state_machine.py: side-wall sitter overlapping the zone in the image stays `off`; person in water without board stays `off`; ride confirmed after 1.5 s and start back-dated to the drop-in; track first seen at the frame edge already on the wave (entry wall off-frame) starts at first appearance with `start_kind = off_frame`; fall ends ride on last on-wave frame; changeover overlap gives two rides
+- [ ] T018 [P] [US1] Ride-joining unit tests in tests/unit/test_joining.py: acid-drop link (track end on/at an entry side wall + on-wave track start within 1 s and N rider heights) starts at the jump; same-edge frame-edge exit and return within 2 s is one ride; return after 2.5 s is two rides; ride < `min_length_s` becomes a short attempt; lesson stretch → only the person on a board rides, flagged `lesson`
 - [ ] T019 [P] [US1] Eval metric unit tests (IoU ≥ 0.5 matching, recall, precision, boundary error p95/median, acid drops separately) in tests/unit/test_eval_metrics.py
 - [ ] T020 [P] [US1] Integration test: pipeline on the 3 min multi-ride fixture with a fixture zone file produces rides.json that validates against the schema and finds the labelled rides, in tests/integration/test_rides_pipeline.py
 
@@ -106,12 +106,12 @@ time it (SC-004), and compare with the hand-made zone file from US1
 
 ### Implementation for User Story 2
 
-- [ ] T036 [US2] Implement zone proposal (density of moving foot points → quadrilateral, both orientations, deck/water boundary from the strongest far edge, entrance and side areas, `proposal_confidence`) writing zones.json and keyframes/<epoch>.jpg in src/surfclip/zone/propose.py; until T034 passes
+- [ ] T036 [US2] Implement zone proposal (density of moving foot points → quadrilateral, both orientations, side walls placed where tracks appear and disappear, corners allowed outside the frame, entry walls, side waiting areas, `proposal_confidence`) writing zones.json and keyframes/<epoch>.jpg in src/surfclip/zone/propose.py; until T034 passes
 - [ ] T037 [US2] Implement the FastAPI app bound to `server.host` (127.0.0.1) with error format, static serving of web/dist, and background job runner with progress/eta in src/surfclip/api/app.py and src/surfclip/api/jobs.py; add `surfclip serve` in src/surfclip/cli.py
 - [ ] T038 [US2] Implement session and zone routes per contracts/http-api.md (PUT zone appends `confirm_zone` with `how` = accepted/edited/drawn and triggers ride stages) in src/surfclip/api/routes_sessions.py and src/surfclip/api/routes_zones.py; until T035 passes
 - [ ] T039 [P] [US2] Implement the typed API client in web/src/lib/api.ts
 - [ ] T040 [US2] Build the Sessions screen (add a source path, min length setting before processing, job progress) in web/src/routes/Sessions.svelte
-- [ ] T041 [US2] Build the Zone editor in web/src/routes/ZoneEditor.svelte: keyframe canvas, draggable role-labelled corners, deck line, entrance/side polygons, one-click Accept, "unreliable proposal" banner with Draw mode, zone shown clipped at frame edges
+- [ ] T041 [US2] Build the Zone editor in web/src/routes/ZoneEditor.svelte: keyframe canvas, draggable role-labelled corners (including off-frame corners on a padded canvas), entry side-wall toggles, side waiting-area polygons, one-click Accept, "unreliable proposal" banner with Draw mode, zone shown clipped at frame edges
 - [ ] T042 [US2] Measure zone setup time on each sample session and record SC-004 results in specs/001-ride-detection-clipping/eval-log.md
 
 **Checkpoint**: New sessions go from upload to rides without hand-made zone files
@@ -239,8 +239,9 @@ Task: "ByteTrack tracking in src/surfclip/track/tracker.py"                     
 ## Notes
 
 - Labels (PRD phase P0) are needed from T031 onwards. They are proposed by the tool and validated by
-  the user, including an 8× miss-scan of the whole session (research R15); `IMG_3106.MP4` must be
-  made local first
+  the user, including an 8× miss-scan of the whole session (research R15). Evaluation sessions:
+  `20260928_IMG_1652.MOV`, `20240924.MP4`, `20241004.MP4`, `20261012_110549566.mp4`, plus the staged
+  bump session (held out, to be filmed)
 - T059's Review screen gains a "label" mode (confirm/trim/delete proposals, add missed rides,
   activity strip) once US4 lands
 - Never write to the sample footage folder; fixtures and outputs live under artifacts/

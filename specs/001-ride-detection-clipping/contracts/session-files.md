@@ -60,8 +60,8 @@ artifacts/<session_id>/
   "schema_version": "1.0.0",
   "edits": [
     {"edit_id": 1, "at": "2026-10-13T11:02:00Z", "op": "confirm_zone", "target": {"epoch_id": 0},
-     "payload": {"corners": {"deck_a": [102, 233], "deck_b": [1180, 241],
-                 "wave_end_a": [40, 690], "wave_end_b": [1265, 702]}, "how": "accepted"}},
+     "payload": {"corners": {"back_a": [102, 233], "back_b": [1180, 241],
+                 "front_a": [40, 690], "front_b": [1265, 702]}, "how": "accepted"}},
     {"edit_id": 2, "at": "2026-10-13T11:05:10Z", "op": "trim", "target": {"ride_id": "r004512"},
      "payload": {"start_s": 150.1}}
   ]

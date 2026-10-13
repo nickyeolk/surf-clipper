@@ -13,8 +13,8 @@
 ### User Story 1 - Get every ride from a session video (Priority: P1)
 
 I give the tool an hour-long session video and get back a list of rides (start, end, confidence)
-and one clip per ride, without scrubbing through waiting time, changeovers or people sitting at
-the entrance.
+and one clip per ride, without scrubbing through waiting time, changeovers or people waiting on
+the side walls.
 
 **Why this priority**: This is the core value of the whole product; every later feature (rider
 labelling, compilation) consumes the ride list.
@@ -27,9 +27,9 @@ confirmed, compare the ride list to the hand labels, and play a few clips.
 1. **Given** a confirmed zone and a session with several riders taking turns, **When** processing
    finishes, **Then** each ride of at least the minimum length appears once in the ride list with
    start, end and confidence, and has its own clip padded 1 s before and 1.5 s after.
-2. **Given** a person sitting at the entrance for several minutes whose image overlaps the wave
+2. **Given** a person sitting on a side wall for several minutes whose image overlaps the wave
    zone, **When** processing finishes, **Then** no ride is produced for them.
-3. **Given** a rider who acid-drops from the deck edge, **When** processing finishes, **Then** the
+3. **Given** a rider who acid-drops from a side wall, **When** processing finishes, **Then** the
    ride starts at the jump, not when the rider is first seen steady on the wave.
 4. **Given** a fall or attempt shorter than the minimum length, **When** processing finishes,
    **Then** it is not in the ride list or clips but is listed as a short attempt.
@@ -38,13 +38,17 @@ confirmed, compare the ride list to the hand labels, and play a few clips.
 6. **Given** a coached lesson with an instructor in the water holding a beginner, **When**
    processing finishes, **Then** only the beginner on the board produces rides, and those rides are
    flagged "lesson".
+7. **Given** the side wall a rider enters from is out of frame, **When** processing finishes,
+   **Then** the ride starts when the rider first appears on the wave at the frame edge, and its
+   start is marked as entering from off-frame.
 
 ---
 
 ### User Story 2 - Confirm the wave zone on one keyframe (Priority: P1)
 
-For each upload the tool proposes the wave-zone corners, the deck/water boundary, and the entrance
-and side waiting areas on a keyframe. I accept with one action, drag points to adjust, or draw
+For each upload the tool proposes the wave-zone corners (the back wall and both side walls, even
+where they lie outside the frame), which side walls riders enter from, and the side waiting areas
+on a keyframe. I accept with one action, drag points to adjust, or draw
 them by hand when the proposal is poor.
 
 **Why this priority**: Framing differs every session; ride detection cannot be correct without a
@@ -56,7 +60,7 @@ proposal, and compare it with the hand-marked zone.
 **Acceptance Scenarios**:
 
 1. **Given** a new session video, **When** the first analysis pass completes, **Then** a keyframe
-   is shown with proposed zone corners, deck/water boundary, and entrance and side areas.
+   is shown with proposed zone corners, the entry side walls, and the side waiting areas.
 2. **Given** a reasonable proposal, **When** I accept it, **Then** it becomes a confirmed zone used
    for that camera epoch, and the step takes under 30 s.
 3. **Given** a low-confidence proposal (too few detections, no clear cluster), **When** the keyframe
@@ -120,8 +124,12 @@ and confirm every edit is still present.
 
 ### Edge Cases
 
-- People standing in the flat water at the back entrance while someone rides (same size as far
-  riders): never counted as riding unless standing on a board and moving along the wave.
+- People standing in the water while someone rides (e.g. an instructor; same size as far riders):
+  never counted as riding unless standing on a board and moving along the wave.
+- One or both side walls out of frame (portrait or close framing): entries and exits through the
+  frame edge are handled like entries and exits over that wall.
+- Portrait recordings, and recordings stored rotated (e.g. upside down): analysed in their
+  displayed orientation.
 - People walking past close to the camera carrying boards, appearing very large: not counted.
 - Rider partly out of frame at the near edge: still counted as present; the truncated view is not
   used for size estimates.
@@ -131,7 +139,8 @@ and confirm every edit is still present.
   washed-out or tinted frames; clips keep the source's HDR.
 - Heavy motion blur on close, fast rides: the ride is not broken into pieces.
 - Far riders as small as about 30 px tall at 720p (0.5x, head-on): still detected.
-- Frame rates of 30, 60 or 120 fps, including slightly variable frame rate: timing stays correct.
+- Frame rates from about 24 to 120 fps, constant or variable (the HDR sample averages 25.7 fps):
+  timing stays correct.
 - Video longer than 1.5 h, or an unsupported format: rejected with a clear message before
   processing starts.
 - No rides found at all (e.g. wrong zone): reported clearly, with a prompt to check the zone.
@@ -143,8 +152,9 @@ and confirm every edit is still present.
 **Input and analysis**
 
 - **FR-001**: System MUST accept local MP4 or MOV phone video (H.264 or HEVC, 8-bit SDR or 10-bit
-  HDR including HLG and Dolby Vision, 720p to 4K, 30–120 fps, up to 1.5 h), both phone originals
-  and exports.
+  HDR including HLG and Dolby Vision, 720p to 4K, landscape or portrait, about 24–120 fps
+  constant or variable, up to 1.5 h), both phone originals and exports, honouring rotation
+  metadata.
 - **FR-002**: System MUST analyse a reduced, tone-mapped proxy of the video while keeping the
   original untouched for clip export. Lens, zoom and HDR metadata MAY be used as hints but MUST NOT
   be required.
@@ -152,16 +162,18 @@ and confirm every edit is still present.
 
 **Zone and scene geometry**
 
-- **FR-004**: System MUST propose, per camera epoch, the four wave-zone corners, the deck/water
-  boundary, and the entrance and side areas, primarily from where people persist and move on the
-  wave.
+- **FR-004**: System MUST propose, per camera epoch, the four wave-zone corners (both ends of the
+  back wall and the front ends of both side walls; corners may lie outside the frame), which side
+  walls are entry edges (default: both), and the side waiting areas, primarily from where people
+  persist and move on the wave.
 - **FR-005**: Users MUST be able to accept the proposal in one action, adjust its points, or draw
   it by hand; a low-confidence proposal MUST be labelled as such.
 - **FR-006**: System MUST measure positions, movement and region membership in normalised pool
   coordinates derived from the confirmed corners, using each person's feet point (estimated when
   hidden), never box overlap in the image.
-- **FR-007**: System MUST NOT assume which side the camera, entrance or waiting areas are on, or
-  which direction riders move; corners are identified by role (deck edge, wave ends).
+- **FR-007**: System MUST NOT assume which side the camera, entry walls or waiting areas are on, or
+  which direction riders move; corners are identified by role (back wall, side walls), never by
+  image left or right.
 
 **Camera epochs**
 
@@ -174,17 +186,18 @@ and confirm every edit is still present.
 **On/off-wave and rides**
 
 - **FR-010**: System MUST give each tracked person a state over time (off, dropping in, on the
-  wave) from feet position relative to the deck/water boundary, board contact, stance and sustained
-  movement along the wave.
+  wave) from feet position in the zone relative to the side walls, board contact, stance and
+  sustained movement along the wave.
 - **FR-011**: System MUST confirm a ride only after on-wave evidence holds for a confirmation
-  window (default 1.5 s), then back-date its start to the boundary crossing or deck-edge departure.
-- **FR-012**: System MUST link a person last seen at the deck edge to an on-wave track that appears
-  shortly after nearby (default within 1 s), so acid-drop rides start at the jump.
-- **FR-013**: System MUST keep people sitting or standing at the entrance or sides, and people in
-  the water not riding a board, in the off state regardless of how long they stay.
+  window (default 1.5 s), then back-date its start to the drop-in from the side wall or, when that
+  wall is out of frame, to the rider's first appearance at the frame edge.
+- **FR-012**: System MUST link a person last seen on or at an entry side wall to an on-wave track
+  that appears shortly after nearby (default within 1 s), so acid-drop rides start at the jump.
+- **FR-013**: System MUST keep people sitting or standing on the side walls or side decks, and
+  people in the water not riding a board, in the off state regardless of how long they stay.
 - **FR-014**: During lessons, System MUST treat only the person standing on a board as the rider
   and flag those rides "lesson".
-- **FR-015**: System MUST end a ride on its last on-wave frame (fall, exit to side or deck, or
+- **FR-015**: System MUST end a ride on its last on-wave frame (fall, exit over a side wall, or
   leaving the zone), allow changeover overlaps, and treat a same-edge frame-edge exit and return
   within the grace window (default 2 s) as one ride.
 - **FR-016**: System MUST join a ride split by a camera-epoch boundary back into one ride.
@@ -225,8 +238,8 @@ and confirm every edit is still present.
   thresholds) and outputs.
 - **Camera epoch**: a time span with a stable camera; owns a confirmed zone and records how it was
   confirmed (accepted, edited, drawn, auto re-mapped) and its re-map reliability.
-- **Zone**: four role-ordered wave-zone corners, the deck/water boundary, and entrance and side
-  areas, defining pool coordinates for one epoch.
+- **Zone**: four role-ordered wave-zone corners (back wall and side walls), the entry side walls,
+  and side waiting areas, defining pool coordinates for one epoch.
 - **Track**: one person followed over time, with per-moment state (off, dropping in, on the wave),
   feet point, truncation and board-contact evidence.
 - **Ride**: a confirmed on-wave span of one track: ID, start/end, confidence, epoch(s), state
@@ -262,7 +275,13 @@ HDR and held-out sessions), not only on average.
 - One rider is normally on the wave at a time; lessons are the stated exception.
 - The camera is a phone on a stand, head-on to about 45° left or right, 1x or 0.5x zoom, with no
   panning or zooming during recording other than occasional bumps or re-positioning.
-- The deck and entrance run along the back (far) edge of the pool as seen from the camera.
+- Riders wait on the side walls or side decks and enter the wave only from the side walls (acid
+  drop or step-in); the back wall is not an entry point. One or both side walls may be out of
+  frame.
+- Evaluation sessions (chosen by the user, 2026-10-13): `20260928_IMG_1652.MOV` (portrait, night),
+  `20240924.MP4` and `20241004.MP4` (720p archive, about 45° right, daylight),
+  `20261012_110549566.mp4` (1080p HLG HDR, night, variable frame rate, recorded upside down), plus
+  the staged bump session (to be filmed; held out from tuning).
 - One continuous file per session; multi-file sessions are out of scope.
 - Everything the tool produces for a session (review copies, stage outputs, ride list, user edits,
   clips) is stored in a per-session folder under the project's `artifacts/` folder, never next to
@@ -290,3 +309,8 @@ HDR and held-out sessions), not only on average.
   (FR-021).
 - Q: Is the browser UI reachable from other devices (phone, tablet)? → A: Laptop only until the
   basics work; phone access considered in 003 (FR-025).
+- Q: Where do riders enter the wave? → A: Only from the side walls, never the back wall
+  (FR-004, FR-010–FR-013, FR-015). When the entry wall is out of frame, the ride starts at the
+  rider's first appearance (User Story 1, scenario 7).
+- Q: Which sessions form the evaluation set? → A: `20260928_IMG_1652`, `20240924`, `20241004`,
+  `20261012_110549566`, plus the staged bump session (Assumptions).
