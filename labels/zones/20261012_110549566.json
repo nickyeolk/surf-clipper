@@ -1,0 +1,11 @@
+{
+  "epoch_id": 0,
+  "corners": {
+    "back_a": [1140, 495],
+    "back_b": [2600, 580],
+    "front_a": [-300, 530],
+    "front_b": [1100, 2000]
+  },
+  "entry_walls": ["side_a", "side_b"],
+  "origin": "user"
+}
