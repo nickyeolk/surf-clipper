@@ -1,0 +1,67 @@
+# Surf Session Clipper - default configuration (constitution IX: config, not constants).
+# Units: seconds (_s), pool units (_pool, 0-1 across/along the wave), rider heights (_heights),
+# fractions of frame size (_frac). Never raw pixels or frame counts, except where a key says
+# "_px_at_720p" (a detector-input size, normalised to a 720p frame).
+# Bump config_version whenever a default changes; it is part of every stage cache key.
+config_version = 1
+
+[analysis]
+fps = 5                       # analysis proxy frame rate
+max_height = 720              # proxy is downscaled to at most this height
+tonemap = "hable"             # HDR -> SDR operator for analysis frames
+
+[detect]
+model = "yolo11s.pt"
+confidence = 0.2
+classes = ["person", "surfboard"]
+half_precision = true
+batch_size = 16
+tiling = "auto"               # "off" | "auto" | "always"
+tiling_min_height_px_at_720p = 60   # tile when expected rider height drops below this
+tile_overlap_frac = 0.2
+
+[track]
+max_gap_s = 1.0               # keep a track alive through detection gaps up to this long
+min_track_s = 0.6
+
+[epochs]
+match_fps = 1
+features = "orb"              # "orb" | "sift"
+jump_frac = 0.02              # sudden shift larger than this fraction of frame width
+drift_frac = 0.02             # cumulative drift threshold
+min_inliers = 150
+min_inlier_ratio = 0.35
+
+[zone]
+proposal_min_tracks = 3
+proposal_min_confidence = 0.5 # below this the UI labels the proposal "unreliable"
+try_both_orientations = true
+undistort_ultrawide = "auto"  # "off" | "auto"
+
+[rides]
+confirm_window_s = 1.5
+min_lateral_speed_pool = 0.05 # pool units per second along the wave
+acid_link_s = 1.0
+acid_link_heights = 3.0       # max distance between deck-edge end and on-wave start
+frame_edge_grace_s = 2.0
+min_length_s = 10.0           # user-settable before processing
+pad_before_s = 1.0
+pad_after_s = 1.5
+refine_window_s = 2.0
+changeover_overlap_max_s = 3.0
+
+[export]
+encoder = "auto"              # "auto" (NVENC, CPU fallback) | "nvenc" | "cpu"
+hdr_codec = "hevc_main10"
+sdr_codec = "h264_high"
+nvenc_preset = "p5"
+cq = 19                       # constant-quality target
+
+[review]
+height = 720
+keyframe_interval_s = 0.5
+thumb_every_s = 10.0
+
+[server]
+host = "127.0.0.1"            # loopback only (FR-025)
+port = 8765
