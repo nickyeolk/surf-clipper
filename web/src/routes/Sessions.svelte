@@ -47,6 +47,7 @@
             {/if}
           </td>
           <td>
+            <a class="button secondary" href={`#/zone/${s.session_id}`}>Zone</a>
             {#if s.has_review_copy && s.rides !== null}
               <a class="button" href={`#/label/${s.session_id}`}>Label</a>
             {:else}

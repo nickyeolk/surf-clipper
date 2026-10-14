@@ -51,6 +51,31 @@ export interface SourceInfo {
   hdr_format: string
 }
 
+export interface Zone {
+  epoch_id: number
+  corners: { back_a: [number, number]; back_b: [number, number]; front_a: [number, number]; front_b: [number, number] }
+  entry_walls: ('side_a' | 'side_b')[]
+  side_areas: [number, number][][]
+  image_to_pool: unknown
+  undistort: unknown
+  origin: string
+  proposal_confidence: number | null
+  face_v: [number, number] | null
+}
+
+export interface FaceBand {
+  face_v: [number, number] | null
+  origin: string
+  frames: number
+}
+
+export interface ZoneInfo {
+  zone: Zone | null
+  face: FaceBand | null
+  frame: { width: number; height: number; duration_s: number }
+  feet: [number, number][]
+}
+
 export class ApiError extends Error {
   constructor(public code: string, message: string) {
     super(message)
@@ -80,6 +105,13 @@ export const api = {
   finalize: (id: string) =>
     call<{ rides: number; path: string }>(`/sessions/${id}/labels/finalize`, { method: 'POST' }),
   videoUrl: (id: string) => `/api/sessions/${id}/media/review.mp4`,
+  zone: (id: string) => call<ZoneInfo>(`/sessions/${id}/zone`),
+  saveZone: (id: string, zone: Zone) =>
+    call<{ rides: number; short_attempts: number; face: FaceBand | null }>(`/sessions/${id}/zone`, {
+      method: 'PUT',
+      body: JSON.stringify(zone),
+    }),
+  keyframeUrl: (id: string, t: number) => `/api/sessions/${id}/keyframe.jpg?t=${Math.round(t)}`,
 }
 
 export function clock(seconds: number): string {

@@ -226,3 +226,9 @@ details.help {
   margin-top: 6px;
   color: var(--muted);
 }
+
+a.button.secondary {
+  background: var(--panel);
+  border-color: var(--border);
+}
+

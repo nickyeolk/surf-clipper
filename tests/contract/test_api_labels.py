@@ -100,6 +100,29 @@ def test_review_video_supports_range(client: TestClient) -> None:
     assert len(r.content) == 100
 
 
+def test_zone_get_without_confirmed_zone(client: TestClient) -> None:
+    body = client.get("/api/sessions/abc123/zone").json()
+    assert body["zone"] is None
+    assert body["frame"] == {"width": 1280, "height": 720, "duration_s": 600.0}
+    assert body["feet"] == []
+
+
+def test_crossed_zone_is_rejected(client: TestClient) -> None:
+    bowtie = {
+        "epoch_id": 0,
+        "corners": {
+            "back_a": [0, 0],
+            "back_b": [100, 0],
+            "front_a": [100, 100],
+            "front_b": [0, 100],
+        },
+        "origin": "user",
+    }
+    r = client.put("/api/sessions/abc123/zone", json=bowtie)
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_zone"
+
+
 def test_activity(client: TestClient) -> None:
     assert client.get("/api/sessions/abc123/activity").json()["values"] == [0.0, 0.5]
 

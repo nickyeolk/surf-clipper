@@ -8,6 +8,7 @@ via Starlette's FileResponse) and stores label work. It contains no pipeline log
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -16,8 +17,12 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from surfclip.edits.log import confirmed_zone, read_edits
 from surfclip.eval.labels import LabelError, LabelWork, finalize, work_from_rides
-from surfclip.store.schemas import Rides, Session, SourceInfo
+from surfclip.store.schemas import Rides, Session, SourceInfo, Zone
+from surfclip.store.session import SessionStore
+from surfclip.zone.editing import confirm_zone, display_size, keyframe, rider_feet
+from surfclip.zone.geometry import GeometryError
 
 
 class ApiError(Exception):
@@ -171,6 +176,47 @@ def create_app(
         work.finalized = True
         save_work(sid, work)
         return {"rides": len(labels.rides), "path": str(final_file)}
+
+    def store_of(sid: str) -> SessionStore:
+        return SessionStore(folder(sid), session_of(sid))
+
+    @app.get("/api/sessions/{sid}/keyframe.jpg")
+    def get_keyframe(sid: str, t: float = 600.0) -> FileResponse:
+        try:
+            return FileResponse(keyframe(store_of(sid), t), media_type="image/jpeg")
+        except subprocess.CalledProcessError as exc:
+            raise ApiError(500, "keyframe_failed", "could not extract a still") from exc
+
+    @app.get("/api/sessions/{sid}/zone")
+    def get_zone(sid: str) -> dict[str, Any]:
+        store = store_of(sid)
+        info: SourceInfo = read(folder(sid) / "probe.json", SourceInfo)
+        zone = confirmed_zone(read_edits(store))
+        face_file = folder(sid) / "face.json"
+        width, height = display_size(info)
+        return {
+            "zone": zone.model_dump(mode="json") if zone else None,
+            "face": json.loads(face_file.read_text(encoding="utf-8"))
+            if face_file.exists()
+            else None,
+            "frame": {"width": width, "height": height, "duration_s": info.duration_s},
+            "feet": rider_feet(store),
+        }
+
+    @app.put("/api/sessions/{sid}/zone")
+    def put_zone(sid: str, zone: Zone) -> dict[str, Any]:
+        try:
+            rides = confirm_zone(store_of(sid), zone)
+        except GeometryError as exc:
+            raise ApiError(400, "invalid_zone", str(exc)) from exc
+        face_file = folder(sid) / "face.json"
+        return {
+            "rides": len(rides.rides),
+            "short_attempts": len(rides.short_attempts),
+            "face": json.loads(face_file.read_text(encoding="utf-8"))
+            if face_file.exists()
+            else None,
+        }
 
     @app.get("/api/sessions/{sid}/media/review.mp4")
     def review_video(sid: str) -> FileResponse:
