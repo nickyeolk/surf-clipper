@@ -107,9 +107,9 @@ time it (SC-004), and compare with the hand-made zone file from US1
 ### Implementation for User Story 2
 
 - [ ] T036 [US2] Implement zone proposal (density of moving foot points → quadrilateral, both orientations, side walls placed where tracks appear and disappear, corners allowed outside the frame, entry walls, side waiting areas, `proposal_confidence`) writing zones.json and keyframes/<epoch>.jpg in src/surfclip/zone/propose.py; until T034 passes
-- [ ] T037 [US2] Implement the FastAPI app bound to `server.host` (127.0.0.1) with error format, static serving of web/dist, and background job runner with progress/eta in src/surfclip/api/app.py and src/surfclip/api/jobs.py; add `surfclip serve` in src/surfclip/cli.py
+- [x] T037 [US2] Implement the FastAPI app bound to `server.host` (127.0.0.1) with error format, static serving of web/dist, and background job runner with progress/eta in src/surfclip/api/app.py and src/surfclip/api/jobs.py; add `surfclip serve` in src/surfclip/cli.py
 - [ ] T038 [US2] Implement session and zone routes per contracts/http-api.md (PUT zone appends `confirm_zone` with `how` = accepted/edited/drawn and triggers ride stages) in src/surfclip/api/routes_sessions.py and src/surfclip/api/routes_zones.py; until T035 passes
-- [ ] T039 [P] [US2] Implement the typed API client in web/src/lib/api.ts
+- [x] T039 [P] [US2] Implement the typed API client in web/src/lib/api.ts
 - [ ] T040 [US2] Build the Sessions screen (add a source path, min length setting before processing, job progress) in web/src/routes/Sessions.svelte
 - [ ] T041 [US2] Build the Zone editor in web/src/routes/ZoneEditor.svelte: keyframe canvas, draggable role-labelled corners (including off-frame corners on a padded canvas), entry side-wall toggles, side waiting-area polygons, one-click Accept, "unreliable proposal" banner with Draw mode, zone shown clipped at frame edges
 - [ ] T042 [US2] Measure zone setup time on each sample session and record SC-004 results in specs/001-ride-detection-clipping/eval-log.md
@@ -242,7 +242,7 @@ Task: "ByteTrack tracking in src/surfclip/track/tracker.py"                     
   the user, including an 8× miss-scan of the whole session (research R15). Evaluation sessions:
   `20260928_IMG_1652.MOV`, `20240924.MP4`, `20241004.MP4`, `20261012_110549566.mp4`, plus the staged
   bump session (held out, to be filmed)
-- T059's Review screen gains a "label" mode (confirm/trim/delete proposals, add missed rides,
+- Label mode is built (2026-10-14): Sessions list + Label screen (routes/Label.svelte), review copy stage, label work API. T059's Review screen gains a "label" mode (confirm/trim/delete proposals, add missed rides,
   activity strip) once US4 lands
 - Never write to the sample footage folder; fixtures and outputs live under artifacts/
 - Commit after each task or logical group
