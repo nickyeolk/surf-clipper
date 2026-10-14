@@ -95,12 +95,18 @@ def test_lesson_flag_when_instructor_stands_in_zone() -> None:
     assert rides[0].flags.lesson
 
 
-def test_group_lesson_on_a_pole_flags_every_beginner() -> None:
+def test_group_lesson_is_one_ride() -> None:
+    """User decision 2026-10-15: a lesson (beginners overlapping on the wave) is one ride."""
     first = track(1, 0.0, ride_segment(15.0, 0.2, 0.7))
-    second = track(2, 0.0, ride_segment(15.0, 0.3, 0.8, v=0.5))
-    rides, _ = _assemble(first, second)
-    assert len(rides) == 2
-    assert all(r.flags.lesson for r in rides)
+    second = track(2, 5.0, ride_segment(20.0, 0.1, 0.9, v=0.5))
+    third = track(3, 19.0, ride_segment(12.0, 0.3, 0.8, v=0.55))
+    rides, _ = _assemble(first, second, third)
+    assert len(rides) == 1
+    r = rides[0]
+    assert r.flags.lesson
+    assert r.start_s == pytest.approx(0.0)
+    assert r.end_s == pytest.approx(third[-1].t)
+    assert sorted(r.track_ids) == [1, 2, 3]
 
 
 def test_changeover_overlap_gives_two_rides() -> None:

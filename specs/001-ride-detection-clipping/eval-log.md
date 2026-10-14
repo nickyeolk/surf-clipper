@@ -67,3 +67,23 @@ not merged by the label containment rule; wall holds up to 10 s.
 
 Open: portrait session rides split (starts 11-23 s late, ends 7-13 s early); three rides
 cut 10-23 s short (20240924 28:04, 20261012 27:08 and 53:22, 20241004 56:03).
+
+## 2026-10-15 - lessons as one ride; portrait framing accepted as a limitation
+
+User decision: a lesson is one ride (FR-014). `_merge_lessons` joins overlapping rides when
+either is a lesson; the 20241004 labels were merged the same way (`merge_lesson_labels.py`,
+lesson ride r000000, 0:00-2:35.6 from 9 items).
+
+| Session | Recall | Precision | Complete | Tightness |
+| --- | --- | --- | --- | --- |
+| 20240924 | 100% | 100% | 93.7% | 1.50 s |
+| 20241004 | 100% | 98.7% | 96.0% | 1.50 s |
+| 20260928_IMG_1652 (not gating) | 96.2% | 91.1% | 77.4% | 1.90 s |
+| 20261012_110549566 | 100% | 100% | 89.7% | 2.54 s |
+
+Portrait session: riders leave the frame mid-ride, so rides split. Accepted as an edge case
+(spec Edge Cases); not gating; rider identification (002) may rejoin them.
+Framing indicators tried (`scripts/edge_report.py`, riding frames cut off by the frame edge):
+20240924 0%, 20241004 0%, portrait 8.8%, night HDR 22.2%. The HDR session is cut off more
+often yet completes 89.7%, and visible wave-face share (portrait 92.9%, HDR 79.6%) did not
+separate them either, so no automatic framing warning yet.

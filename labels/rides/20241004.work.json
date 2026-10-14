@@ -6,109 +6,109 @@
       "id": "r000000",
       "start_s": 0.0,
       "end_s": 155.6,
-      "verdict": "ok",
+      "verdict": "fix",
       "acid_drop": false,
       "detected_as": "unknown",
       "proposed_start_s": 0.0,
       "proposed_end_s": 155.6,
       "confidence": 0.8351417590725806,
-      "notes": ""
+      "notes": "whole lesson as one ride"
     },
     {
       "id": "r000000_1",
       "start_s": 0.0,
       "end_s": 34.6,
-      "verdict": "ok",
+      "verdict": "no",
       "acid_drop": false,
       "detected_as": "unknown",
       "proposed_start_s": 0.0,
       "proposed_end_s": 34.6,
       "confidence": 0.8503698590158046,
-      "notes": ""
+      "notes": "merged into lesson ride r000000"
     },
     {
       "id": "r000000_2",
       "start_s": 0.0,
       "end_s": 50.0,
-      "verdict": "ok",
+      "verdict": "no",
       "acid_drop": false,
       "detected_as": "unknown",
       "proposed_start_s": 0.0,
       "proposed_end_s": 50.0,
       "confidence": 0.8860086995766933,
-      "notes": ""
+      "notes": "merged into lesson ride r000000"
     },
     {
       "id": "r000180",
       "start_s": 6.0,
       "end_s": 27.2,
-      "verdict": "ok",
+      "verdict": "no",
       "acid_drop": true,
       "detected_as": "acid_drop",
       "proposed_start_s": 6.0,
       "proposed_end_s": 27.2,
       "confidence": 0.811279296875,
-      "notes": ""
+      "notes": "merged into lesson ride r000000"
     },
     {
       "id": "r000954",
       "start_s": 31.8,
       "end_s": 74.2,
-      "verdict": "ok",
+      "verdict": "no",
       "acid_drop": false,
       "detected_as": "unknown",
       "proposed_start_s": 31.8,
       "proposed_end_s": 74.2,
       "confidence": 0.8236135563380281,
-      "notes": ""
+      "notes": "merged into lesson ride r000000"
     },
     {
       "id": "r001650",
       "start_s": 55.0,
       "end_s": 150.4,
-      "verdict": "ok",
+      "verdict": "no",
       "acid_drop": false,
       "detected_as": "unknown",
       "proposed_start_s": 55.0,
       "proposed_end_s": 150.4,
       "confidence": 0.8697024548901674,
-      "notes": ""
+      "notes": "merged into lesson ride r000000"
     },
     {
       "id": "r001902",
       "start_s": 63.4,
       "end_s": 88.2,
-      "verdict": "ok",
+      "verdict": "no",
       "acid_drop": true,
       "detected_as": "acid_drop",
       "proposed_start_s": 63.4,
       "proposed_end_s": 88.2,
       "confidence": 0.8747046685987904,
-      "notes": ""
+      "notes": "merged into lesson ride r000000"
     },
     {
       "id": "r002418",
       "start_s": 80.6,
       "end_s": 135.6,
-      "verdict": "ok",
+      "verdict": "no",
       "acid_drop": false,
       "detected_as": "unknown",
       "proposed_start_s": 80.6,
       "proposed_end_s": 135.6,
       "confidence": 0.8491781192974452,
-      "notes": ""
+      "notes": "merged into lesson ride r000000"
     },
     {
       "id": "r002808",
       "start_s": 93.6,
       "end_s": 105.6,
-      "verdict": "ok",
+      "verdict": "no",
       "acid_drop": true,
       "detected_as": "acid_drop",
       "proposed_start_s": 93.6,
       "proposed_end_s": 105.6,
       "confidence": 0.77265625,
-      "notes": ""
+      "notes": "merged into lesson ride r000000"
     },
     {
       "id": "r005172",

@@ -37,6 +37,32 @@ class _Draft:
     first_ev: Evidence  # first on-wave evidence (where the rider was when the run began)
     last_ev: Evidence
     evidence: list[Evidence] = field(default_factory=list[Evidence])
+    lesson: bool = False
+
+
+def _merge_lessons(drafts: list[_Draft], cfg: RidesConfig) -> list[_Draft]:
+    """A lesson is one ride (user decision 2026-10-15): beginners overlapping on the wave are
+    merged into a single ride spanning the whole lesson, flagged "lesson". A ride joins a lesson
+    when either is a lesson ride and they overlap by more than a changeover."""
+    merged: list[_Draft] = []
+    for d in sorted(drafts, key=lambda x: x.start_t):
+        prev = merged[-1] if merged else None
+        overlap = (min(prev.end_t, d.end_t) - d.start_t) if prev else 0.0
+        if (
+            prev is not None
+            and (prev.lesson or d.lesson)
+            and (
+                overlap > cfg.changeover_overlap_max_s or (prev.lesson and d.lesson and overlap > 0)
+            )
+        ):
+            if d.end_t > prev.end_t:
+                prev.end_t, prev.last_ev = d.end_t, d.last_ev
+            prev.track_ids += [t for t in d.track_ids if t not in prev.track_ids]
+            prev.evidence += d.evidence
+            prev.lesson = True
+            continue
+        merged.append(d)
+    return merged
 
 
 def _draft(tr: TrackRide) -> _Draft:
@@ -177,6 +203,9 @@ def assemble(
     _link_acid_drops(drafts, evidence, cfg)
     drafts = _merge_edge_returns(drafts, cfg)
     drafts = _merge_continuations(drafts, cfg)
+    for d in drafts:
+        d.lesson = _lesson(d, evidence, cfg)
+    drafts = _merge_lessons(drafts, cfg)
 
     rides: list[Ride] = []
     short: list[ShortAttempt] = []
@@ -218,7 +247,7 @@ def assemble(
                 start_kind=d.start_kind,
                 state_timeline=_timeline(d),
                 flags=RideFlags(
-                    lesson=_lesson(d, evidence, cfg),
+                    lesson=d.lesson,
                     truncated=any(ev.obs.edge != "none" for ev in d.evidence),
                 ),
             )

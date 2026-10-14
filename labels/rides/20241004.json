@@ -6,55 +6,7 @@
       "start_s": 0.0,
       "end_s": 155.6,
       "acid_drop": false,
-      "origin": "accepted"
-    },
-    {
-      "start_s": 0.0,
-      "end_s": 34.6,
-      "acid_drop": false,
-      "origin": "accepted"
-    },
-    {
-      "start_s": 0.0,
-      "end_s": 50.0,
-      "acid_drop": false,
-      "origin": "accepted"
-    },
-    {
-      "start_s": 6.0,
-      "end_s": 27.2,
-      "acid_drop": true,
-      "origin": "accepted"
-    },
-    {
-      "start_s": 31.8,
-      "end_s": 74.2,
-      "acid_drop": false,
-      "origin": "accepted"
-    },
-    {
-      "start_s": 55.0,
-      "end_s": 150.4,
-      "acid_drop": false,
-      "origin": "accepted"
-    },
-    {
-      "start_s": 63.4,
-      "end_s": 88.2,
-      "acid_drop": true,
-      "origin": "accepted"
-    },
-    {
-      "start_s": 80.6,
-      "end_s": 135.6,
-      "acid_drop": false,
-      "origin": "accepted"
-    },
-    {
-      "start_s": 93.6,
-      "end_s": 105.6,
-      "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 172.4,

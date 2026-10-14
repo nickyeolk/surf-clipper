@@ -128,6 +128,14 @@ and confirm every edit is still present.
   never counted as riding unless standing on a board and moving along the wave.
 - One or both side walls out of frame (portrait or close framing): entries and exits through the
   frame edge are handled like entries and exits over that wall.
+- **Known limitation (accepted 2026-10-15):** when too much of the pool is out of frame, riders
+  leave the frame entirely mid-ride and a ride can split into two (seen on the portrait session
+  20260928_IMG_1652: complete 77%). Sessions framed like this are reported but do not gate the
+  success criteria. Rider identification (feature 002) may rejoin the pieces. Advice for filming:
+  keep both side walls, or most of the wave face, in frame. An automatic framing warning was
+  considered; neither visible-face share nor edge-cut share predicted the splits reliably yet.
+- A coached lesson (several beginners on the wave at once, e.g. on a pole) is one ride spanning
+  the whole lesson, flagged "lesson" (user decision 2026-10-15).
 - Portrait recordings, and recordings stored rotated (e.g. upside down): analysed in their
   displayed orientation.
 - People walking past close to the camera carrying boards, appearing very large: not counted.
@@ -197,8 +205,9 @@ and confirm every edit is still present.
   that appears shortly after nearby (default within 1 s), so acid-drop rides start at the jump.
 - **FR-013**: System MUST keep people sitting or standing on the side walls or side decks, and
   people in the water not riding a board, in the off state regardless of how long they stay.
-- **FR-014**: During lessons, System MUST treat only the person standing on a board as the rider
-  and flag those rides "lesson".
+- **FR-014**: During lessons, System MUST treat only people standing on a board as riders, and
+  MUST merge the overlapping rides of a lesson into one ride spanning the whole lesson, flagged
+  "lesson" (user decision 2026-10-15: lessons are rare and not important to the user).
 - **FR-015**: System MUST end a ride on its last on-wave frame: the last frame the rider is on the
   wave face (a fall, being washed over the back of the wave, an exit over a side wall, or leaving
   the zone). Time in the whitewater behind the wave, upright or not, is not part of the ride. It
@@ -258,7 +267,8 @@ and confirm every edit is still present.
 ### Measurable Outcomes
 
 All targets must hold on **each** labelled evaluation session (including the 0.5x, bumped, night
-HDR and held-out sessions), not only on average.
+HDR and held-out sessions), not only on average. Exception: sessions where too much of the pool
+is out of frame (see Edge Cases) are reported but do not gate these targets.
 
 - **SC-001**: At least 95% of hand-labelled rides at or above the minimum length are found
   (matched at time overlap IoU ≥ 0.5).
@@ -336,5 +346,8 @@ HDR and held-out sessions), not only on average.
   the board separating). Washed over the back: the first frame the feet are behind the face.
   Natural variation of about a second remains, so SC-003 measures clip completeness and
   tightness rather than exact boundary error.
+- Q: How are lessons clipped? → A: The whole lesson is one ride flagged "lesson" (FR-014).
+- Q: What about sessions where riders leave the frame mid-ride? → A: Accepted limitation: such
+  rides may split; reported but not gating; rider identification (002) may rejoin them.
 - Q: Which sessions form the evaluation set? → A: `20260928_IMG_1652`, `20240924`, `20241004`,
   `20261012_110549566`, plus the staged bump session (Assumptions).
