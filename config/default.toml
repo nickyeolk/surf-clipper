@@ -61,7 +61,12 @@ zone_margin_pool = 0.05       # tolerance around the zone's back and front edges
 acid_link_s = 1.0
 acid_link_heights = 3.0       # max distance between a side-wall track end and the on-wave start
 lesson_overlap_frac = 0.5     # ride flagged "lesson" if others are in the zone this much of it
-stitch_gap_s = 1.5            # join track fragments of one person across gaps up to this long
+face_band = "auto"            # "auto": estimate the wave face per session; "off": whole zone
+face_low_pct = 5              # face band = these percentiles of confirmed riders' feet depth...
+face_high_pct = 98
+face_margin_pool = 0.08       # ...widened by this margin
+face_min_frames = 200         # fewer confirmed riding frames than this: no band
+stitch_gap_s = 1.5           # join track fragments of one person across gaps up to this long
 stitch_base_heights = 1.5     # ...when the next fragment starts within this many rider heights
 stitch_heights_per_s = 3.0    # ...plus this much per second of gap (riders move fast)
 frame_edge_grace_s = 2.0

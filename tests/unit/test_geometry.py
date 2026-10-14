@@ -62,6 +62,13 @@ def test_self_intersecting_corners_are_rejected() -> None:
         PoolMapping.from_corners(bowtie)
 
 
+def test_points_beyond_the_horizon_are_off_the_plane() -> None:
+    m = PoolMapping.from_corners(OBLIQUE)
+    # Back wall high in the image: far above it lies the horizon, then the far side of it.
+    pts = np.array([(650.0, 400.0), (650.0, 210.0), (650.0, -5000.0)])
+    assert m.on_plane(pts).tolist() == [True, True, False]
+
+
 def test_matrix_round_trips_through_schema_tuple() -> None:
     m = PoolMapping.from_corners(OBLIQUE)
     again = PoolMapping.from_matrix(m.as_tuple())

@@ -85,21 +85,30 @@ def to_source_pixels(observations: Sequence[Obs], sx: float, sy: float) -> list[
     ]
 
 
-def classify(observations: Sequence[Obs], zone: Zone, cfg: RidesConfig) -> list[Evidence]:
+def classify(
+    observations: Sequence[Obs],
+    zone: Zone,
+    cfg: RidesConfig,
+    face: tuple[float, float] | None = None,
+) -> list[Evidence]:
     """Evidence for one track's observations, sorted by time.
 
     Observations and zone must be in the same pixel space: source display pixels.
+
+    ``face`` is the wave face as a band of pool depth ``(v_min, v_max)``: riding also requires
+    the feet on it (FR-015). Whitewater behind the wave is in the zone but off the face.
     """
-    """Evidence for one track's observations, sorted by time."""
     obs = sorted(observations, key=lambda o: o.t)
     if not obs:
         return []
     mapping = PoolMapping.from_corners(zone.corners)
-    pool = mapping.to_pool(np.array([o.feet for o in obs], dtype=np.float64))
+    feet = np.array([o.feet for o in obs], dtype=np.float64)
+    pool = mapping.to_pool(feet)
+    on_plane = mapping.on_plane(feet)
     out: list[Evidence] = []
-    for o, (u, v) in zip(obs, pool, strict=True):
+    for o, (u, v), plane in zip(obs, pool, on_plane, strict=True):
         u, v = float(u), float(v)
-        in_depth = -cfg.zone_margin_pool <= v <= 1 + cfg.zone_margin_pool
+        in_depth = bool(plane) and -cfg.zone_margin_pool <= v <= 1 + cfg.zone_margin_pool
         wall = _wall(u, cfg) if in_depth else None
         region: Region
         if wall is not None and wall in zone.entry_walls:
@@ -109,6 +118,9 @@ def classify(observations: Sequence[Obs], zone: Zone, cfg: RidesConfig) -> list[
         else:
             region = "outside"
         on_board = o.board or o.edge == "bottom"  # board below the frame edge
-        candidate = region == "zone" and on_board and o.stance in ("standing", "crouched")
+        on_face = face is None or face[0] <= v <= face[1]
+        candidate = (
+            region == "zone" and on_face and on_board and o.stance in ("standing", "crouched")
+        )
         out.append(Evidence(o, u, v, region, wall, candidate))
     return out

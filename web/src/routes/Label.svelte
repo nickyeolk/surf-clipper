@@ -245,7 +245,9 @@
         <strong>Labelling rule:</strong> a ride starts at the drop-in (or first appearance, if the
         side wall is out of shot) and <strong>ends at the last frame on the wave face</strong>:
         a fall, being washed over the back, or exiting over a side wall. Whitewater time behind
-        the wave is not part of the ride, even if the rider is still upright.
+        the wave is not part of the ride, even if the rider is still upright. Airs count as on
+        the wave: a landed air continues the ride; a failed air ends when the rider hits the water
+        or loses the board.
       </p>
       <details class="help">
         <summary>Keyboard shortcuts</summary>

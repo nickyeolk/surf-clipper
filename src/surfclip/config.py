@@ -83,6 +83,11 @@ class RidesConfig(_Section):
     acid_link_s: float
     acid_link_heights: float
     lesson_overlap_frac: float
+    face_band: Literal["auto", "off"]
+    face_low_pct: float
+    face_high_pct: float
+    face_margin_pool: float
+    face_min_frames: int
     stitch_gap_s: float
     stitch_base_heights: float
     stitch_heights_per_s: float

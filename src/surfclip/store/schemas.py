@@ -127,6 +127,7 @@ class Zone(_Model):
     corners: ZoneCorners
     entry_walls: list[SideWall] = Field(default_factory=lambda: ["side_a", "side_b"])
     side_areas: list[list[Point]] = Field(default_factory=list[list[Point]])  # waiting, image px
+    face_v: tuple[float, float] | None = None  # wave face as pool-depth band; None = estimate
     image_to_pool: Matrix3 | None = None
     undistort: dict[str, float] | None = None
     origin: Literal["proposed", "auto_remap", "user"]

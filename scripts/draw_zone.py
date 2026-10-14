@@ -1,11 +1,12 @@
 """Draw a zone (corners by role, pool grid) over a keyframe for review.
 
-Usage: draw_zone.py KEYFRAME.jpg ZONE.json OUT.jpg
+Usage: draw_zone.py KEYFRAME.jpg ZONE.json OUT.jpg [FACE.json]
 ZONE.json holds a schema Zone (corners may lie outside the frame).
 """
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -51,6 +52,13 @@ def main() -> None:
             colour = (160, 160, 160)
         pts = mapping.to_image(np.linspace(a, b, 40))
         cv2.polylines(overlay, [np.array([px(p) for p in pts])], False, colour, 5)
+    if len(sys.argv) > 4:  # face.json from a processed session: shade the wave-face band
+        face = json.loads(Path(sys.argv[4]).read_text()).get("face_v")
+        if face:
+            lo, hi = face
+            band = np.vstack([np.linspace((0, lo), (1, lo), 40), np.linspace((1, hi), (0, hi), 40)])
+            poly = np.array([px(p) for p in mapping.to_image(band)], dtype=np.int32)
+            cv2.fillPoly(overlay, [poly], (80, 200, 80))
     canvas = cv2.addWeighted(overlay, 0.6, canvas, 0.4, 0)
     for role, colour in ROLE_COLOURS.items():
         p = np.array(getattr(zone.corners, role), dtype=float)
@@ -68,7 +76,7 @@ def main() -> None:
     cv2.rectangle(canvas, (pad, pad), (pad + w, pad + h), (200, 200, 200), 1)
     cv2.putText(
         canvas,
-        "orange = entry side walls, grey = back wall; grid = pool coords, 0.1",
+        "orange = entry side walls, grey = back wall, green = wave face",
         (20, 40),
         cv2.FONT_HERSHEY_SIMPLEX,
         1.0,

@@ -121,6 +121,32 @@ def test_rider_carving_next_to_a_side_wall_stays_riding() -> None:
     assert len(rides) == 1
 
 
+FACE = (0.3, 0.6)
+
+
+def test_washed_over_the_back_ends_ride_even_if_upright() -> None:
+    """FR-015: still standing on the board in the whitewater behind the wave is not riding."""
+    obs = track(1, 0.0, ride_segment(12.0, v=0.45), Seg(5.0, 0.8, 0.85, v=0.85, board=True))
+    c = rides_cfg()
+    _, rides = track_rides(classify(obs, ZONE, c, face=FACE), c)
+    assert len(rides) == 1
+    assert rides[0].end_t == pytest.approx(obs[round(12.0 * FPS) - 1].t)
+
+
+def test_landed_air_stays_one_ride() -> None:
+    """An ollie lifts the feet off the face for under a second; the ride continues."""
+    obs = track(
+        1,
+        0.0,
+        ride_segment(6.0, 0.1, 0.4, v=0.45),
+        Seg(0.6, 0.4, 0.45, v=0.15, board=True),  # in the air: feet project towards the back
+        ride_segment(6.0, 0.45, 0.8, v=0.45),
+    )
+    c = rides_cfg()
+    _, rides = track_rides(classify(obs, ZONE, c, face=FACE), c)
+    assert len(rides) == 1
+
+
 def test_mirrored_scene_gives_same_rides() -> None:
     obs = track(1, 0.0, sitting_on_wall(3.0, u=1.05), ride_segment(12.0, 0.92, 0.3))
     _, rides = _rides(obs)

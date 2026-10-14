@@ -103,6 +103,19 @@ class PoolMapping:
     def to_pool(self, points: ArrayLike) -> FloatArray:
         return _apply(self.image_to_pool, points)
 
+    def on_plane(self, points: ArrayLike) -> NDArray[np.bool_]:
+        """True for image points on the pool's side of the zone's horizon.
+
+        The homography sends one image line to infinity; points beyond it are not on the pool
+        plane and map to meaningless pool coordinates (found with zones drawn from off-frame
+        corner estimates, 2026-10-14).
+        """
+        pts = np.asarray(points, dtype=np.float64).reshape(-1, 2)
+        w = pts @ self.image_to_pool[2, :2] + self.image_to_pool[2, 2]
+        centre = np.array([0.5, 0.5, 1.0]) @ self.pool_to_image.T
+        side = np.sign(self.image_to_pool[2] @ (centre / centre[2]))
+        return np.sign(w) == side
+
     def to_image(self, points: ArrayLike) -> FloatArray:
         return _apply(self.pool_to_image, points)
 

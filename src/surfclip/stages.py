@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from surfclip.config import RidesConfig
 from surfclip.edits.apply import apply_edits
 from surfclip.edits.log import confirmed_zone, read_edits
 from surfclip.media.decode import Frame, iter_proxy_frames, output_size
@@ -26,6 +27,7 @@ from surfclip.media.review import make_review_copy
 from surfclip.pipeline import Pipeline, Stage, StageContext
 from surfclip.rides.assemble import assemble
 from surfclip.rides.evidence import Evidence, Obs, classify, to_source_pixels
+from surfclip.rides.face import FaceBand, estimate_face
 from surfclip.rides.state_machine import TrackRide, track_rides
 from surfclip.rides.stitch import stitch
 from surfclip.store.frames import (
@@ -42,6 +44,7 @@ from surfclip.store.schemas import (
     SourceInfo,
     SourceSummary,
     StageName,
+    Zone,
 )
 from surfclip.store.session import SessionStore
 from surfclip.track.tracker import AnalysedFrame, track_people
@@ -156,7 +159,7 @@ class RidesStage(Stage):
     name: StageName = "rides"
     depends_on: tuple[StageName, ...] = ("track",)
     config_sections: tuple[str, ...] = ("rides",)
-    code_version: str = "5"  # 5: activity.json; 4: truncated riders; 3: source px; 2: stitch
+    code_version: str = "6"  # 6: face band, horizon; 5: activity; 4: truncated; 3: px; 2: stitch
 
     def extra_inputs(self, store: SessionStore) -> list[str]:
         # The confirmed zone and every ride edit change rides.json; this stage is cheap.
@@ -176,8 +179,10 @@ class RidesStage(Stage):
         for o in to_source_pixels(read_observations(tracks_file), sx, sy):
             by_track[o.track_id].append(o)
         chains, members = stitch(list(by_track.values()), cfg)
+        face = self._face(chains, zone, cfg)
+        store.write_model("face.json", face)
         evidence: dict[int, list[Evidence]] = {
-            cid: classify(obs, zone, cfg) for cid, obs in chains.items()
+            cid: classify(obs, zone, cfg, face=face.face_v) for cid, obs in chains.items()
         }
         store.write_model(
             "activity.json", activity(evidence, info.duration_s, read_meta(tracks_file).fps)
@@ -204,7 +209,21 @@ class RidesStage(Stage):
         store.write_model("rides.detected.json", detected)
         edited = apply_edits(detected, read_edits(store))
         store.write_model("rides.json", attach_exports(edited, read_exports(store), store))
-        return ["rides.detected.json", "rides.json", "activity.json"]
+        return ["rides.detected.json", "rides.json", "activity.json", "face.json"]
+
+    @staticmethod
+    def _face(chains: dict[int, list[Obs]], zone: Zone, cfg: RidesConfig) -> FaceBand:
+        """The user's face band if set, else estimated from a first pass without one."""
+        if zone.face_v is not None:
+            return FaceBand(face_v=zone.face_v, origin="zone", frames=0)
+        on_wave_v: list[float] = []
+        for obs in chains.values():
+            evs = classify(obs, zone, cfg)
+            states, _ = track_rides(evs, cfg)
+            on_wave_v += [
+                ev.v for ev, st in zip(evs, states, strict=True) if st == "on_wave" and ev.candidate
+            ]
+        return estimate_face(on_wave_v, cfg)
 
 
 class Activity(BaseModel):

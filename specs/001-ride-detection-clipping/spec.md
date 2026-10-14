@@ -321,5 +321,8 @@ HDR and held-out sessions), not only on average.
 - Q: When does a ride end? → A: At the last frame the rider is on the wave face. Falling, or
   being washed over the back into the whitewater, ends it even if the rider is still upright on
   the board; whitewater time is not part of the ride (FR-015; also the labelling rule).
+  Time in the air above the face (ollies, airs) counts as on the wave: a landed air is part of
+  the ride, a failed air ends when the rider hits the water or separates from the board. Brief
+  excursions off the face band (up to the evidence gap, 1.5 s) therefore do not end a ride.
 - Q: Which sessions form the evaluation set? → A: `20260928_IMG_1652`, `20240924`, `20241004`,
   `20261012_110549566`, plus the staged bump session (Assumptions).
