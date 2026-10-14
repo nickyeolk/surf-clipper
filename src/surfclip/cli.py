@@ -230,6 +230,31 @@ def export(
     )
 
 
+@app.command()
+def serve(
+    artifacts: ArtifactsOpt = Path("artifacts"),
+    config: ConfigOpt = DEFAULT_CONFIG_PATH,
+    labels_dir: Annotated[Path, typer.Option("--labels-dir")] = Path("labels/rides"),
+) -> None:
+    """Start the local backend and browser UI (loopback only)."""
+    import uvicorn
+
+    from surfclip.api.app import create_app
+
+    cfg = load_config(config)
+    web_dist = Path(__file__).resolve().parents[2] / "web" / "dist"
+    if not (web_dist / "index.html").exists():
+        typer.echo("note: web UI not built yet (cd web && npm run build); API only", err=True)
+    url = f"http://localhost:{cfg.server.port}"
+    typer.echo(f"Surf Session Clipper at {url}  (Ctrl+C to stop)", err=True)
+    uvicorn.run(
+        create_app(artifacts.resolve(), labels_dir.resolve(), web_dist),
+        host=cfg.server.host,
+        port=cfg.server.port,
+        log_level="warning",
+    )
+
+
 models_app = typer.Typer(no_args_is_help=True, help="Manage pretrained model weights.")
 app.add_typer(models_app, name="models")
 

@@ -82,6 +82,7 @@ max_bitrate_factor = 1.5      # cap clip bitrate at this multiple of the source'
 [review]
 height = 720
 keyframe_interval_s = 0.5
+max_kbps = 2500               # review copy bitrate cap (~1.1 GB per hour at 720p)
 thumb_every_s = 10.0
 
 [server]

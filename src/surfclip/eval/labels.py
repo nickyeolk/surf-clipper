@@ -1,6 +1,11 @@
 """Hand labels, proposed by the tool and validated by the user (research R15).
 
-Workflow until the review UI's label mode exists (US4):
+Two ways to validate:
+
+* **Review UI, label mode** (preferred): a working document ``labels/rides/<name>.work.json``
+  holds one item per proposed ride with the user's verdict, saved as they go. Finalising writes
+  ``labels/rides/<name>.json``. Label work never changes the detected rides or edits.json.
+* **CSV** (fallback):
 
 1. ``surfclip labels propose VIDEO`` writes ``labels/rides/<name>.csv`` from the detected rides
    and short attempts, every row with verdict ``?``.
@@ -53,6 +58,91 @@ class SessionLabels(BaseModel):
     source: str
     rides: list[LabelRide] = Field(default_factory=list[LabelRide])
     camera_shifts_s: list[float] = Field(default_factory=list[float])
+
+
+class LabelItem(BaseModel):
+    """One ride in the label working document."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    start_s: float
+    end_s: float
+    verdict: Verdict = "?"
+    acid_drop: bool = False
+    detected_as: str | None = None  # start kind or "short"; None for rides the user added
+    proposed_start_s: float | None = None
+    proposed_end_s: float | None = None
+    confidence: float | None = None
+    notes: str = ""
+
+
+class LabelWork(BaseModel):
+    """Label progress for one session, saved as the user goes (labels/rides/<name>.work.json)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: str = SCHEMA_VERSION
+    source: str
+    items: list[LabelItem] = Field(default_factory=list[LabelItem])
+    scanned_to_s: float = 0.0  # how far the user has scanned the whole video for missed rides
+    finalized: bool = False
+
+    @property
+    def remaining(self) -> int:
+        return sum(1 for i in self.items if i.verdict == "?")
+
+
+Origin = Literal["accepted", "corrected", "added"]
+_ORIGIN: dict[str, Origin] = {"ok": "accepted", "fix": "corrected", "add": "added"}
+
+
+def work_from_rides(rides: Rides, source: str) -> LabelWork:
+    items = [
+        LabelItem(
+            id=r.ride_id,
+            start_s=r.start_s,
+            end_s=r.end_s,
+            detected_as=r.start_kind,
+            acid_drop=r.start_kind == "acid_drop",
+            proposed_start_s=r.start_s,
+            proposed_end_s=r.end_s,
+            confidence=r.confidence,
+        )
+        for r in rides.rides
+    ] + [
+        LabelItem(
+            id=s.ride_id,
+            start_s=s.start_s,
+            end_s=s.end_s,
+            detected_as="short",
+            proposed_start_s=s.start_s,
+            proposed_end_s=s.end_s,
+            confidence=s.confidence,
+        )
+        for s in rides.short_attempts
+    ]
+    return LabelWork(source=source, items=sorted(items, key=lambda i: i.start_s))
+
+
+def finalize(work: LabelWork) -> SessionLabels:
+    if work.remaining:
+        raise LabelError(f"{work.remaining} rides still need a verdict")
+    rides: list[LabelRide] = []
+    for item in work.items:
+        if item.verdict == "no":
+            continue
+        if item.end_s <= item.start_s:
+            raise LabelError(f"{item.id}: end must be after start")
+        rides.append(
+            LabelRide(
+                start_s=item.start_s,
+                end_s=item.end_s,
+                acid_drop=item.acid_drop,
+                origin=_ORIGIN[item.verdict],
+            )
+        )
+    return SessionLabels(source=work.source, rides=sorted(rides, key=lambda r: r.start_s))
 
 
 def fmt_time(seconds: float) -> str:

@@ -32,11 +32,20 @@ Base URL `http://127.0.0.1:8765/api`. JSON bodies; errors as
 | `GET /sessions/{id}/edits` | | edit log |
 | `POST /sessions/{id}/export` | `{rides?: [id], all?: bool}` | `{job_id}`; only new/changed rides re-encoded |
 
+## Labels (ground truth; never changes rides or edits)
+
+| Method & path | Body | Response |
+| --- | --- | --- |
+| `GET /sessions/{id}/activity` | | `{bin_s, values: [0..1]}` share of analysed frames per bin with someone riding |
+| `GET /sessions/{id}/labels` | | label work: `{source, items: [{id, start_s, end_s, verdict: ?/ok/fix/no/add, acid_drop, detected_as, proposed_start_s, proposed_end_s, confidence, notes}], scanned_to_s, finalized}`; created from rides.json on first call |
+| `PUT /sessions/{id}/labels` | label work | saved to `labels/rides/<name>.work.json` |
+| `POST /sessions/{id}/labels/finalize` | | `{rides, path}`; writes `labels/rides/<name>.json`; 409 `labels_incomplete` while any verdict is `?` |
+
 ## Media (all support HTTP Range)
 
 | Method & path | Response |
 | --- | --- |
-| `GET /sessions/{id}/media/review.mp4` | 720p review copy |
+| `GET /sessions/{id}/media/review.mp4` | 720p H.264 SDR review copy, keyframe every 0.5 s, ≤ 2.5 Mbps (implemented) |
 | `GET /sessions/{id}/media/rides/{ride_id}/review.mp4` | per-ride review segment (padded) |
 | `GET /sessions/{id}/media/thumbs/{n}.jpg` + `GET .../thumbs/index.json` | sprite sheets + timing |
 | `GET /sessions/{id}/media/frame?t=S` or `?frame=N` | exact frame as PNG (SDR) |

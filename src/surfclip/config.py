@@ -107,6 +107,7 @@ class ReviewConfig(_Section):
     height: int
     keyframe_interval_s: float
     thumb_every_s: float
+    max_kbps: int
 
 
 class ServerConfig(_Section):

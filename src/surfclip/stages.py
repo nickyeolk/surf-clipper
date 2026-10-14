@@ -8,17 +8,21 @@ Until zone proposal exists (US2), the rides stage needs a zone confirmed with
 from __future__ import annotations
 
 import logging
+import math
 import time
 from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel
+
 from surfclip.edits.apply import apply_edits
 from surfclip.edits.log import confirmed_zone, read_edits
 from surfclip.media.decode import Frame, iter_proxy_frames, output_size
 from surfclip.media.export import attach_exports, read_exports
 from surfclip.media.probe import probe
+from surfclip.media.review import make_review_copy
 from surfclip.pipeline import Pipeline, Stage, StageContext
 from surfclip.rides.assemble import assemble
 from surfclip.rides.evidence import Evidence, Obs, classify, to_source_pixels
@@ -62,6 +66,20 @@ class ProbeStage(Stage):
     def run(self, ctx: StageContext) -> list[str]:
         ctx.store.write_model("probe.json", probe(ctx.store.source))
         return ["probe.json"]
+
+
+@dataclass
+class ReviewCopyStage(Stage):
+    name: StageName = "review_copy"
+    depends_on: tuple[StageName, ...] = ("probe",)
+    config_sections: tuple[str, ...] = ("review",)
+    code_version: str = "1"
+    cpu: bool = False
+
+    def run(self, ctx: StageContext) -> list[str]:
+        info = ctx.store.read_model("probe.json", SourceInfo)
+        make_review_copy(info, ctx.store.path("review.mp4"), ctx.config.review, cpu=self.cpu)
+        return ["review.mp4"]
 
 
 @dataclass
@@ -138,7 +156,7 @@ class RidesStage(Stage):
     name: StageName = "rides"
     depends_on: tuple[StageName, ...] = ("track",)
     config_sections: tuple[str, ...] = ("rides",)
-    code_version: str = "4"  # 4: bottom-truncated riders; 3: source pixels; 2: stitching
+    code_version: str = "5"  # 5: activity.json; 4: truncated riders; 3: source px; 2: stitch
 
     def extra_inputs(self, store: SessionStore) -> list[str]:
         # The confirmed zone and every ride edit change rides.json; this stage is cheap.
@@ -161,6 +179,9 @@ class RidesStage(Stage):
         evidence: dict[int, list[Evidence]] = {
             cid: classify(obs, zone, cfg) for cid, obs in chains.items()
         }
+        store.write_model(
+            "activity.json", activity(evidence, info.duration_s, read_meta(tracks_file).fps)
+        )
         trs: list[TrackRide] = [r for evs in evidence.values() for r in track_rides(evs, cfg)[1]]
         rides, short = assemble(
             trs, evidence, cfg=cfg, fps=info.avg_fps, duration_s=info.duration_s
@@ -183,7 +204,27 @@ class RidesStage(Stage):
         store.write_model("rides.detected.json", detected)
         edited = apply_edits(detected, read_edits(store))
         store.write_model("rides.json", attach_exports(edited, read_exports(store), store))
-        return ["rides.detected.json", "rides.json"]
+        return ["rides.detected.json", "rides.json", "activity.json"]
+
+
+class Activity(BaseModel):
+    """Share of analysed frames per bin with someone riding (review timeline strip)."""
+
+    bin_s: float
+    values: list[float]
+
+
+def activity(
+    evidence: dict[int, list[Evidence]], duration_s: float, fps: float, bin_s: float = 1.0
+) -> Activity:
+    n = max(1, math.ceil(duration_s / bin_s))
+    seen: list[set[float]] = [set() for _ in range(n)]
+    for evs in evidence.values():
+        for ev in evs:
+            if ev.candidate:
+                seen[min(n - 1, int(ev.t / bin_s))].add(round(ev.t, 2))
+    per_bin = max(1.0, fps * bin_s)
+    return Activity(bin_s=bin_s, values=[round(min(1.0, len(s) / per_bin), 2) for s in seen])
 
 
 def source_scale(info: SourceInfo, meta: FrameMeta) -> tuple[float, float]:
@@ -193,4 +234,6 @@ def source_scale(info: SourceInfo, meta: FrameMeta) -> tuple[float, float]:
 
 
 def default_pipeline(*, cpu: bool = False) -> Pipeline:
-    return Pipeline([ProbeStage(), DetectStage(cpu=cpu), TrackStage(), RidesStage()])
+    return Pipeline(
+        [ProbeStage(), ReviewCopyStage(cpu=cpu), DetectStage(cpu=cpu), TrackStage(), RidesStage()]
+    )
