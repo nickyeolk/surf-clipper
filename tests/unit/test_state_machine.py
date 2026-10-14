@@ -127,6 +127,26 @@ def test_rider_cut_off_at_frame_bottom_counts_without_visible_board() -> None:
     assert len(rides) == 1
 
 
+def test_rider_cut_off_at_a_side_edge_counts_without_visible_board() -> None:
+    """20261012 14:47: the rider carves past the left frame edge; the board is out of shot."""
+    obs = track(
+        1,
+        0.0,
+        ride_segment(8.0, 0.9, 0.6),
+        Seg(5.0, 0.6, 0.55, board=False, edge="left"),
+        ride_segment(6.0, 0.55, 0.8),
+    )
+    _, rides = _rides(obs)
+    assert len(rides) == 1
+    assert rides[0].end_t == pytest.approx(obs[-1].t)
+
+
+def test_standing_at_a_side_edge_does_not_start_a_ride() -> None:
+    obs = track(1, 0.0, Seg(20.0, 0.3, 0.7, board=False, edge="left"))
+    _, rides = _rides(obs)
+    assert rides == []
+
+
 def test_rider_carving_next_to_a_side_wall_stays_riding() -> None:
     obs = track(1, 0.0, ride_segment(6.0, 0.5, 0.98), ride_segment(6.0, 0.98, 0.5))
     _, rides = _rides(obs)

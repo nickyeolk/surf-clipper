@@ -3,7 +3,9 @@
 Every observation is placed in pool coordinates from its feet point. A person counts as a
 riding *candidate* only when their feet are inside the wave zone, they are standing or crouched,
 and a board is under their feet. When the box is cut off by the bottom of the frame (close
-cameras, e.g. 20261012), the board is out of shot, so standing in the zone is enough. People on
+cameras, e.g. 20261012), the board is out of shot, so standing in the zone is enough. Cut off at
+a side edge, the frame can only continue a ride already under way (``continues``): standing
+at the edge must not start one. People on
 an entry side wall (sitting, standing, holding a board) are never candidates, however much their
 box overlaps the wave in the image.
 """
@@ -53,6 +55,7 @@ class Evidence:
     wall: SideWall | None
     candidate: bool
     on_face: bool = True
+    continues: bool = False  # can extend a ride already under way (see classify)
 
     @property
     def t(self) -> float:
@@ -123,5 +126,8 @@ def classify(
         candidate = (
             region == "zone" and on_face and on_board and o.stance in ("standing", "crouched")
         )
-        out.append(Evidence(o, u, v, region, wall, candidate, on_face))
+        upright = o.stance in ("standing", "crouched")
+        # Cut off at a side edge, board out of shot: may continue a ride, never start one.
+        continues = region == "zone" and on_face and upright and o.edge in ("left", "right")
+        out.append(Evidence(o, u, v, region, wall, candidate, on_face, continues))
     return out

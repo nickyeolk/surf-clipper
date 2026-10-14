@@ -73,7 +73,7 @@ def _runs(evs: Sequence[Evidence], cfg: RidesConfig, step: float) -> list[tuple[
     runs: list[tuple[int, int]] = []
     start = last = -1
     for i, ev in enumerate(evs):
-        if not ev.candidate:
+        if not (ev.candidate or (start >= 0 and ev.continues)):
             continue
         gap = ev.t - evs[last].t - step if start >= 0 else float("inf")
         bridged = (
