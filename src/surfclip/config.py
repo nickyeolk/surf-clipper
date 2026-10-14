@@ -100,6 +100,7 @@ class ExportConfig(_Section):
     sdr_codec: str
     nvenc_preset: str
     cq: int
+    max_bitrate_factor: float
 
 
 class ReviewConfig(_Section):

@@ -22,6 +22,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from surfclip.config import ExportConfig
+from surfclip.media.probe import probe
 from surfclip.store.schemas import ExportRecord, Ride, Rides, SourceInfo
 from surfclip.store.session import SessionStore
 
@@ -36,6 +37,19 @@ class Exports(BaseModel):
 
 
 def _codec_args(info: SourceInfo, cfg: ExportConfig, cpu: bool) -> list[str]:
+    """Encoder arguments, with the bitrate capped relative to the source.
+
+    Constant quality alone made 720p clips ~2x the source bitrate (55 MB for 57 s on 20241004):
+    re-encoding cannot add detail, so the cap keeps clips near the source's size.
+    """
+    args = _quality_args(info, cfg, cpu)
+    if info.bit_rate:
+        cap = int(info.bit_rate * cfg.max_bitrate_factor)
+        args += ["-maxrate", str(cap), "-bufsize", str(2 * cap)]
+    return args
+
+
+def _quality_args(info: SourceInfo, cfg: ExportConfig, cpu: bool) -> list[str]:
     hdr = info.hdr_format != "none"
     if hdr:
         trc = "arib-std-b67" if info.hdr_format in ("hlg", "dolby_vision") else "smpte2084"
@@ -187,6 +201,8 @@ def export_rides(
 ) -> tuple[list[str], list[str]]:
     """Export new or changed clips. Returns (exported ride ids, skipped up-to-date ride ids)."""
     info = store.read_model("probe.json", SourceInfo)
+    if info.bit_rate is None:  # probe.json from before bit_rate was recorded; re-probing is cheap
+        info = probe(Path(info.path))
     rides = store.read_model("rides.json", Rides)
     exports = read_exports(store)
     todo = [r for r in rides.rides if ride_ids is None or r.ride_id in ride_ids]

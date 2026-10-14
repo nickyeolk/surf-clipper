@@ -52,6 +52,11 @@ def _rotation(stream: dict[str, Any]) -> int:
     return int(tags.get("rotate", 0)) % 360
 
 
+def _int_or_none(value: object) -> int | None:
+    text = str(value) if value is not None else ""
+    return int(text) if text.isdigit() else None
+
+
 def _bit_depth(stream: dict[str, Any]) -> int:
     raw = stream.get("bits_per_raw_sample")
     if raw and str(raw).isdigit():
@@ -110,6 +115,7 @@ def parse_probe(path: str, data: dict[str, Any]) -> SourceInfo:
         hdr_format=_hdr_format(video),
         rotation=_rotation(video),
         has_audio=any(s.get("codec_type") == "audio" for s in streams),
+        bit_rate=_int_or_none(video.get("bit_rate") or fmt.get("bit_rate")),
         device_hints={k: v for k, v in tags.items() if k in _HINT_TAGS},
     )
 

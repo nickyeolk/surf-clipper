@@ -75,6 +75,7 @@ hdr_codec = "hevc_main10"
 sdr_codec = "h264_high"
 nvenc_preset = "p5"
 cq = 19                       # constant-quality target
+max_bitrate_factor = 1.5      # cap clip bitrate at this multiple of the source's
 
 [review]
 height = 720

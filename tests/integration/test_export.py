@@ -102,6 +102,9 @@ def test_sdr_archive_clip(tmp_path: Path, cpu: bool) -> None:
     assert s["color_transfer"] == "bt709"
     expected = round((603.0 + 1.5 - 599.0) * info.avg_fps)  # ride + 2.5 s padding
     assert abs(int(s["nb_read_frames"]) - expected) <= 1
+    assert info.bit_rate is not None
+    size_bits = out.stat().st_size * 8
+    assert size_bits / 5.5 <= info.bit_rate * 1.5 * 1.15  # capped near 1.5x source bitrate
 
 
 @pytest.mark.parametrize("trc", ["arib-std-b67", "smpte2084"], ids=["hlg", "pq"])

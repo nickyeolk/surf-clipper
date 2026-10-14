@@ -82,6 +82,7 @@ class SourceInfo(_Versioned):
     hdr_format: Literal["none", "hlg", "hdr10", "dolby_vision"]
     rotation: int = 0
     has_audio: bool = False
+    bit_rate: int | None = None  # video bits per second, when known
     device_hints: dict[str, str] = Field(default_factory=dict[str, str])
 
 
