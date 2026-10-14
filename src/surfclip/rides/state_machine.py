@@ -69,6 +69,23 @@ def _down_time(evs: Sequence[Evidence], a: int, b: int, step: float, cfg: RidesC
     return down
 
 
+def _wall_stall(evs: Sequence[Evidence], a: int, b: int, step: float, cfg: RidesConfig) -> bool:
+    """Every frame between a and b is the rider holding on at a side wall (20241004: crouched
+    against the wall for ~5 s, then riding on). Sitting without a board is waiting on the wall,
+    not a stall; that, or not being seen, may add up to at most the evidence gap."""
+    between = evs[a + 1 : b]
+    if not between:
+        return False
+    down = sum(max(0.0, evs[k + 1].t - evs[k].t - step) for k in range(a, b))
+    for ev in between:
+        at_wall = ev.u <= cfg.wall_stall_pool or ev.u >= 1 - cfg.wall_stall_pool
+        if not (at_wall and ev.region in ("zone", "side_wall")):
+            return False
+        if not (ev.obs.stance in ("standing", "crouched") or ev.obs.board):
+            down += step
+    return down <= cfg.evidence_gap_s + _EPS
+
+
 def _runs(evs: Sequence[Evidence], cfg: RidesConfig, step: float) -> list[tuple[int, int]]:
     runs: list[tuple[int, int]] = []
     start = last = -1
@@ -79,7 +96,7 @@ def _runs(evs: Sequence[Evidence], cfg: RidesConfig, step: float) -> list[tuple[
         bridged = (
             gap <= cfg.upright_bridge_s + _EPS
             and _down_time(evs, last, i, step, cfg) <= cfg.evidence_gap_s + _EPS
-        )
+        ) or (gap <= cfg.wall_stall_max_s + _EPS and _wall_stall(evs, last, i, step, cfg))
         if start >= 0 and (gap <= cfg.evidence_gap_s + _EPS or bridged):
             last = i
             continue

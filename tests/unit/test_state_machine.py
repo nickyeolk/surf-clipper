@@ -197,6 +197,34 @@ def test_stall_against_the_wall_stays_one_ride() -> None:
     assert len(rides) == 1
 
 
+def test_long_hold_on_the_wall_stays_one_ride() -> None:
+    """20241004 11:00: crouched holding the side wall for ~5 s, then rides on."""
+    obs = track(
+        1,
+        0.0,
+        sitting_on_wall(1.0),
+        ride_segment(3.0, 0.05, 0.98),
+        Seg(4.6, 1.01, 1.04, board=False, stance="crouched"),
+        ride_segment(10.0, 0.99, 0.2),
+    )
+    _, rides = _rides(obs)
+    assert len(rides) == 1
+    assert rides[0].start_t == pytest.approx(obs[4].t)  # the jump from the wall, not the stall
+
+
+def test_climbing_out_onto_the_wall_ends_the_ride() -> None:
+    """Sitting on the wall without a board is waiting, not a stall: a new drop-in is a new ride."""
+    obs = track(
+        1,
+        0.0,
+        ride_segment(12.0, 0.3, 0.98),
+        Seg(6.0, 1.06, 1.06, board=False, stance="sitting"),
+        ride_segment(12.0, 0.97, 0.2),
+    )
+    _, rides = _rides(obs)
+    assert len(rides) == 2
+
+
 def test_fall_with_a_gap_still_splits() -> None:
     obs = track(
         1,
