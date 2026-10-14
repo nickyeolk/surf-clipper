@@ -78,6 +78,7 @@ class RidesConfig(_Section):
     min_lateral_speed_pool: float
     evidence_gap_s: float
     upright_bridge_s: float
+    wall_stall_pool: float
     wall_band_in_pool: float
     wall_band_out_pool: float
     zone_margin_pool: float

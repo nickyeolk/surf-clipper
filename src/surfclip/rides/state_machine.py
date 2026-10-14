@@ -47,22 +47,24 @@ def _frame_step(evs: Sequence[Evidence]) -> float:
     return median(diffs) if diffs else 0.0
 
 
-def _still_riding(ev: Evidence) -> bool:
+def _still_riding(ev: Evidence, cfg: RidesConfig) -> bool:
     """Plausibly still riding without full evidence: on the face or against a side wall, and
-    either upright or with the board under the feet (a hand on the wall, or a deep crouch that
-    the box shape reads as "sitting"; both seen on 20240924). Not gone behind the wave."""
+    upright, on the board, or stalled against a side wall in any posture (a hand on the wall,
+    a deep crouch the box shape reads as "sitting", sitting back against the wall; all seen
+    on 20240924). Not gone behind the wave."""
     in_pool = ev.region == "side_wall" or (ev.region == "zone" and ev.on_face)
-    return in_pool and (ev.obs.stance in ("standing", "crouched") or ev.obs.board)
+    at_wall = ev.u <= cfg.wall_stall_pool or ev.u >= 1 - cfg.wall_stall_pool
+    return in_pool and (ev.obs.stance in ("standing", "crouched") or ev.obs.board or at_wall)
 
 
-def _down_time(evs: Sequence[Evidence], a: int, b: int, step: float) -> float:
+def _down_time(evs: Sequence[Evidence], a: int, b: int, step: float, cfg: RidesConfig) -> float:
     """Time between frames a and b that looks like being down: frames that are not still
     riding, plus stretches with no detection at all."""
     down = 0.0
     for k in range(a, b):
         nxt = evs[k + 1]
         down += max(0.0, nxt.t - evs[k].t - step)  # not detected
-        if k + 1 < b and not _still_riding(nxt):
+        if k + 1 < b and not _still_riding(nxt, cfg):
             down += step
     return down
 
@@ -76,7 +78,7 @@ def _runs(evs: Sequence[Evidence], cfg: RidesConfig, step: float) -> list[tuple[
         gap = ev.t - evs[last].t - step if start >= 0 else float("inf")
         bridged = (
             gap <= cfg.upright_bridge_s + _EPS
-            and _down_time(evs, last, i, step) <= cfg.evidence_gap_s + _EPS
+            and _down_time(evs, last, i, step, cfg) <= cfg.evidence_gap_s + _EPS
         )
         if start >= 0 and (gap <= cfg.evidence_gap_s + _EPS or bridged):
             last = i

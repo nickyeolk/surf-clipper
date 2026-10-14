@@ -100,6 +100,32 @@ def _merge_edge_returns(drafts: list[_Draft], cfg: RidesConfig) -> list[_Draft]:
     return merged
 
 
+def _merge_continuations(drafts: list[_Draft], cfg: RidesConfig) -> list[_Draft]:
+    """Join a ride with an unexplained start to one that ended just before, at the same spot.
+
+    The tracker sometimes hands a rider to another track id mid-ride, and stitching refuses
+    because that id already existed (20240924 28:04). Thresholds are the stitching ones.
+    """
+    drafts = sorted(drafts, key=lambda d: d.start_t)
+    merged: list[_Draft] = []
+    for d in drafts:
+        prev = max(merged, key=lambda p: p.end_t, default=None)
+        if prev is not None and d.start_kind == "unknown":
+            gap = d.start_t - prev.end_t
+            a, b = prev.last_ev.obs, d.first_ev.obs
+            height = max(a.box_height, b.box_height, 1.0)
+            dist = math.hypot(b.feet[0] - a.feet[0], b.feet[1] - a.feet[1]) / height
+            near = dist <= cfg.stitch_base_heights + cfg.stitch_heights_per_s * max(gap, 0.0)
+            if -0.2 <= gap <= cfg.stitch_gap_s + _EPS and near:
+                prev.end_t = max(prev.end_t, d.end_t)
+                prev.last_ev = d.last_ev
+                prev.track_ids += [t for t in d.track_ids if t not in prev.track_ids]
+                prev.evidence += d.evidence
+                continue
+        merged.append(d)
+    return merged
+
+
 def _lesson(d: _Draft, evidence: Mapping[int, Sequence[Evidence]], cfg: RidesConfig) -> bool:
     duration = d.end_t - d.start_t
     if duration <= 0:
@@ -150,6 +176,7 @@ def assemble(
     drafts = [_draft(tr) for tr in track_rides]
     _link_acid_drops(drafts, evidence, cfg)
     drafts = _merge_edge_returns(drafts, cfg)
+    drafts = _merge_continuations(drafts, cfg)
 
     rides: list[Ride] = []
     short: list[ShortAttempt] = []

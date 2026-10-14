@@ -58,6 +58,23 @@ def test_frame_edge_return_after_grace_is_two_rides() -> None:
     assert len(rides) == 2
 
 
+def test_identity_switch_mid_ride_is_one_ride() -> None:
+    """20240924 28:04: the tracker hands the rider to another track id at the same spot."""
+    a = track(5, 0.0, ride_segment(7.0, 0.7, 0.06))
+    b = track(6, a[-1].t + 0.2, ride_segment(12.0, 0.08, 0.8))
+    rides, short = _assemble(a, b)
+    assert len(rides) == 1 and not short
+    assert rides[0].start_s == pytest.approx(0.0)
+    assert rides[0].track_ids == [5, 6]
+
+
+def test_new_ride_far_away_is_not_a_continuation() -> None:
+    a = track(5, 0.0, ride_segment(12.0, 0.7, 0.1))
+    b = track(6, a[-1].t + 0.2, ride_segment(12.0, 0.8, 0.3, v=0.9))
+    rides, _ = _assemble(a, b)
+    assert len(rides) == 2
+
+
 def test_ride_shorter_than_minimum_is_a_short_attempt() -> None:
     rides, short = _assemble(track(1, 0.0, ride_segment(6.0)))
     assert rides == []

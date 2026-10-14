@@ -1,0 +1,571 @@
+{
+  "schema_version": "1.0.0",
+  "source": "20261012_110549566.mp4",
+  "rides": [
+    {
+      "start_s": 9.17984,
+      "end_s": 16.5823,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 22.9804,
+      "end_s": 49.605,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 61.1804,
+      "end_s": 90.7907,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 96.9854,
+      "end_s": 131.592,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 139.989,
+      "end_s": 159.798,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 175.992,
+      "end_s": 222.603,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 230.677414,
+      "end_s": 272.339492,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 282.8,
+      "end_s": 329.209,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 335.807,
+      "end_s": 375.017,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 380.211,
+      "end_s": 396.310093,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 408.214,
+      "end_s": 427.02,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 437.018,
+      "end_s": 472.073197,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 479.62,
+      "end_s": 504.231,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 516.427,
+      "end_s": 529.831,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 542.826,
+      "end_s": 556.033,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 570.433,
+      "end_s": 586.233,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 594.031,
+      "end_s": 626.438546,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 634.834,
+      "end_s": 661.642,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 666.037,
+      "end_s": 681.244,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 688.039,
+      "end_s": 711.661,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 720.844,
+      "end_s": 738.646,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 750.846,
+      "end_s": 780.722664,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 784.449,
+      "end_s": 819.468,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 825.65,
+      "end_s": 848.858,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 854.856,
+      "end_s": 900.930082,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 908.46,
+      "end_s": 922.263,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 929.46,
+      "end_s": 953.882,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 963.252,
+      "end_s": 986.173,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 995.754,
+      "end_s": 1012.42,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1021.17,
+      "end_s": 1039.949744,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1054.71,
+      "end_s": 1118.66,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1124.824882,
+      "end_s": 1146.862951,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 1155.643571,
+      "end_s": 1175.96,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1183.86,
+      "end_s": 1191.78,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1209.9,
+      "end_s": 1237.284686,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 1246.57,
+      "end_s": 1253.03,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1278.86,
+      "end_s": 1293.65,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1308.44,
+      "end_s": 1333.24,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1339.48,
+      "end_s": 1348.65,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1356.98,
+      "end_s": 1378.23,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1386.77,
+      "end_s": 1407.613387,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1410.72,
+      "end_s": 1451.070602,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1458.376794,
+      "end_s": 1483.997018,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 1488.64,
+      "end_s": 1498.01,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1511.55,
+      "end_s": 1528.64,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1536.34,
+      "end_s": 1573.731368,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 1537.8,
+      "end_s": 1572.38,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1577.38,
+      "end_s": 1600.287023,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 1604.46,
+      "end_s": 1614.67,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1628.0,
+      "end_s": 1660.640996,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 1663.02,
+      "end_s": 1685.08,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1693.21,
+      "end_s": 1715.68486,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 1727.58,
+      "end_s": 1767.16,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1770.5,
+      "end_s": 1825.957932,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1835.86,
+      "end_s": 1874.692074,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 1884.4,
+      "end_s": 1920.623301,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1929.4,
+      "end_s": 1946.49,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1951.06,
+      "end_s": 1979.4,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1989.6,
+      "end_s": 2026.89,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2030.85,
+      "end_s": 2049.980169,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2056.89,
+      "end_s": 2084.118724,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 2094.76911,
+      "end_s": 2133.35,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2138.97,
+      "end_s": 2203.733795,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 2209.59,
+      "end_s": 2229.38,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2238.55,
+      "end_s": 2273.34,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2281.04,
+      "end_s": 2299.38,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2307.29,
+      "end_s": 2359.79,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2368.33,
+      "end_s": 2389.16,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2397.49,
+      "end_s": 2440.293519,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 2447.08,
+      "end_s": 2471.04,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2478.74,
+      "end_s": 2506.03,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2532.69,
+      "end_s": 2562.060484,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2574.98,
+      "end_s": 2593.96,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2614.36,
+      "end_s": 2641.44,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2647.48,
+      "end_s": 2691.23,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2699.56,
+      "end_s": 2722.703111,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2729.97,
+      "end_s": 2750.657588,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 2756.43,
+      "end_s": 2771.01,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2778.055104,
+      "end_s": 2809.76,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2818.72,
+      "end_s": 2826.64,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2836.42,
+      "end_s": 2862.88,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2872.46,
+      "end_s": 2887.05,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2903.89,
+      "end_s": 2942.994596,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 2952.0,
+      "end_s": 2967.84,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2976.79,
+      "end_s": 3013.46,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3021.60468,
+      "end_s": 3042.786126,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3050.75,
+      "end_s": 3068.66,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3078.987842,
+      "end_s": 3097.41,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 3106.78,
+      "end_s": 3126.104799,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3137.84468,
+      "end_s": 3164.477267,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3170.53,
+      "end_s": 3192.2,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3202.463616,
+      "end_s": 3240.582261,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3242.82,
+      "end_s": 3271.15,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3287.19,
+      "end_s": 3305.73,
+      "acid_drop": false,
+      "origin": "accepted"
+    }
+  ],
+  "camera_shifts_s": []
+}

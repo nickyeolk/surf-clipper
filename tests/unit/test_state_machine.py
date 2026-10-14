@@ -164,13 +164,26 @@ def test_deep_crouch_read_as_sitting_stays_one_ride() -> None:
     assert len(rides) == 1
 
 
+def test_stall_against_the_wall_stays_one_ride() -> None:
+    """20240924 57:24: sits low against the side wall for ~2 s, then rides on."""
+    obs = track(
+        1,
+        0.0,
+        ride_segment(8.0, 0.3, 0.95),
+        Seg(2.2, 0.97, 0.99, board=False, stance="sitting"),
+        ride_segment(8.0, 0.98, 0.2),
+    )
+    _, rides = _rides(obs)
+    assert len(rides) == 1
+
+
 def test_fall_with_a_gap_still_splits() -> None:
     obs = track(
         1,
         0.0,
-        ride_segment(8.0, 0.3, 0.9),
-        Seg(2.5, 0.9, 0.9, board=False, stance="sitting"),  # down in the water
-        ride_segment(8.0, 0.9, 0.3),
+        ride_segment(8.0, 0.2, 0.5),
+        Seg(2.5, 0.5, 0.5, board=False, stance="sitting"),  # down in the water, mid-wave
+        ride_segment(8.0, 0.5, 0.2),
     )
     _, rides = _rides(obs)
     assert len(rides) == 2
