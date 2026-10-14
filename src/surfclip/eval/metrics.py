@@ -44,6 +44,9 @@ class Metrics:
     end_err_median: float = 0.0
     end_err_p95: float = 0.0
     acid_start_errs: list[float] = field(default_factory=list[float])
+    completeness: float = 1.0  # share of eligible labels entirely inside their padded clip
+    incomplete: list[int] = field(default_factory=list[int])  # label indices (incl. missed)
+    overhang_p95: float = 0.0  # clip extent beyond the label, either end, 95th percentile
 
 
 def iou(a: Span, b: Span) -> float:
@@ -60,8 +63,14 @@ def _stats(errs: list[float]) -> tuple[float, float]:
 
 
 def evaluate(
-    detected: Sequence[Span], labels: Sequence[LabelRide], *, min_length_s: float = 0.0
+    detected: Sequence[Span],
+    labels: Sequence[LabelRide],
+    *,
+    min_length_s: float = 0.0,
+    pad_before_s: float = 0.0,
+    pad_after_s: float = 0.0,
 ) -> Metrics:
+    """Detected spans are ride boundaries without padding; clips add the padding (SC-003)."""
     pairs = sorted(
         (
             (iou(d, Span(lab.start_s, lab.end_s)), di, li)
@@ -93,6 +102,19 @@ def evaluate(
         (acid if lab.acid_drop else start_errs).append(s_err)
         end_errs.append(abs(det.end_s - lab.end_s))
 
+    incomplete: list[int] = []
+    overhangs: list[float] = []
+    eps = 1e-6
+    for li in eligible:
+        if li not in matched:
+            incomplete.append(li)
+            continue
+        lab, det = labels[li], detected[matched[li]]
+        clip_start, clip_end = det.start_s - pad_before_s, det.end_s + pad_after_s
+        if clip_start > lab.start_s + eps or clip_end < lab.end_s - eps:
+            incomplete.append(li)
+        overhangs += [max(0.0, lab.start_s - clip_start), max(0.0, clip_end - lab.end_s)]
+
     s_med, s_p95 = _stats(start_errs)
     e_med, e_p95 = _stats(end_errs)
     return Metrics(
@@ -107,4 +129,7 @@ def evaluate(
         end_err_median=e_med,
         end_err_p95=e_p95,
         acid_start_errs=acid,
+        completeness=1 - len(incomplete) / len(eligible) if eligible else 1.0,
+        incomplete=incomplete,
+        overhang_p95=_stats(overhangs)[1],
     )

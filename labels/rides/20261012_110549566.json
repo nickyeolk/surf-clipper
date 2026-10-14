@@ -42,7 +42,7 @@
       "start_s": 230.677414,
       "end_s": 272.339492,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 282.8,
@@ -60,7 +60,7 @@
       "start_s": 380.211,
       "end_s": 396.310093,
       "acid_drop": false,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 408.214,
@@ -72,7 +72,7 @@
       "start_s": 437.018,
       "end_s": 472.073197,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 479.62,
@@ -102,7 +102,7 @@
       "start_s": 594.031,
       "end_s": 626.438546,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 634.834,
@@ -132,7 +132,7 @@
       "start_s": 750.846,
       "end_s": 780.722664,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 784.449,
@@ -150,7 +150,7 @@
       "start_s": 854.856,
       "end_s": 900.930082,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 908.46,
@@ -180,7 +180,7 @@
       "start_s": 1021.17,
       "end_s": 1039.949744,
       "acid_drop": false,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 1054.71,
@@ -198,7 +198,7 @@
       "start_s": 1155.643571,
       "end_s": 1175.96,
       "acid_drop": false,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 1183.86,
@@ -246,13 +246,13 @@
       "start_s": 1386.77,
       "end_s": 1407.613387,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 1410.72,
       "end_s": 1451.070602,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 1458.376794,
@@ -277,12 +277,6 @@
       "end_s": 1573.731368,
       "acid_drop": true,
       "origin": "corrected"
-    },
-    {
-      "start_s": 1537.8,
-      "end_s": 1572.38,
-      "acid_drop": true,
-      "origin": "accepted"
     },
     {
       "start_s": 1577.38,
@@ -324,7 +318,7 @@
       "start_s": 1770.5,
       "end_s": 1825.957932,
       "acid_drop": false,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 1835.86,
@@ -336,7 +330,7 @@
       "start_s": 1884.4,
       "end_s": 1920.623301,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 1929.4,
@@ -360,7 +354,7 @@
       "start_s": 2030.85,
       "end_s": 2049.980169,
       "acid_drop": false,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 2056.89,
@@ -372,7 +366,7 @@
       "start_s": 2094.76911,
       "end_s": 2133.35,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 2138.97,
@@ -432,7 +426,7 @@
       "start_s": 2532.69,
       "end_s": 2562.060484,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 2574.98,
@@ -456,7 +450,7 @@
       "start_s": 2699.56,
       "end_s": 2722.703111,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 2729.97,
@@ -474,7 +468,7 @@
       "start_s": 2778.055104,
       "end_s": 2809.76,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 2818.72,
@@ -516,7 +510,7 @@
       "start_s": 3021.60468,
       "end_s": 3042.786126,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 3050.75,
@@ -534,13 +528,13 @@
       "start_s": 3106.78,
       "end_s": 3126.104799,
       "acid_drop": false,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 3137.84468,
       "end_s": 3164.477267,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 3170.53,
@@ -552,7 +546,7 @@
       "start_s": 3202.463616,
       "end_s": 3240.582261,
       "acid_drop": true,
-      "origin": "accepted"
+      "origin": "corrected"
     },
     {
       "start_s": 3242.82,

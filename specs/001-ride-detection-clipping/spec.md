@@ -263,8 +263,13 @@ HDR and held-out sessions), not only on average.
 - **SC-001**: At least 95% of hand-labelled rides at or above the minimum length are found
   (matched at time overlap IoU ≥ 0.5).
 - **SC-002**: At least 90% of detected rides match a hand-labelled ride.
-- **SC-003**: Ride start and end errors are under 1 s at the 95th percentile and under 0.5 s at the
-  median; acid-drop starts are reported separately.
+- **SC-003**: Clips are complete and tight. *Completeness*: at least 95% of labelled rides lie
+  entirely within their matched ride's padded clip (1 s before, 1.5 s after), so the tool may
+  start up to 1 s late or end up to 1.5 s early without cutting anything; missed rides count as
+  incomplete. *Tightness*: at the 95th percentile, a clip extends no more than 3 s beyond the
+  labelled ride at either end. Raw start/end errors are still reported (acid drops separately)
+  as diagnostics. (Changed 2026-10-14 from "start and end error < 1 s at p95": a second either
+  way is natural labelling variation; what matters is that no part of a ride is cut off.)
 - **SC-004**: Confirming or fixing the zone takes 30 s or less per camera epoch.
 - **SC-005**: 100% of real and synthetic camera shifts larger than 2% of frame width are detected.
 - **SC-006**: A 1 h video is ready for review in 30 min or less on the user's Windows laptop with a
@@ -324,5 +329,12 @@ HDR and held-out sessions), not only on average.
   Time in the air above the face (ollies, airs) counts as on the wave: a landed air is part of
   the ride, a failed air ends when the rider hits the water or separates from the board. Brief
   excursions off the face band (up to the evidence gap, 1.5 s) therefore do not end a ride.
+- Q: Exactly which instant is a ride's start and end? → A: Start from sitting on the wall: the
+  instant they leave the wall. Acid drop: the instant they leave the wall (the jump), not the
+  run-up on the deck. Entry wall out of frame: the first frame they appear. End by a fall: the
+  first frame they are clearly no longer riding the board (hand, knee or body in the water, or
+  the board separating). Washed over the back: the first frame the feet are behind the face.
+  Natural variation of about a second remains, so SC-003 measures clip completeness and
+  tightness rather than exact boundary error.
 - Q: Which sessions form the evaluation set? → A: `20260928_IMG_1652`, `20240924`, `20241004`,
   `20261012_110549566`, plus the staged bump session (Assumptions).

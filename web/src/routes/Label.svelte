@@ -260,14 +260,20 @@
         they're riding. Blue shading = watched for missed rides
         ({clock(work.scanned_to_s)} of {clock(duration)}).
       </p>
-      <p class="small rule">
-        <strong>Labelling rule:</strong> a ride starts at the drop-in (or first appearance, if the
-        side wall is out of shot) and <strong>ends at the last frame on the wave face</strong>:
-        a fall, being washed over the back, or exiting over a side wall. Whitewater time behind
-        the wave is not part of the ride, even if the rider is still upright. Airs count as on
-        the wave: a landed air continues the ride; a failed air ends when the rider hits the water
-        or loses the board.
-      </p>
+      <details class="small rule">
+        <summary><strong>Labelling rule</strong> (start / end)</summary>
+        <p>
+          <strong>Start:</strong> the instant the rider leaves the side wall (bum or board off it;
+          for acid drops the jump, not the run-up), or their first frame if the wall is out of
+          shot.<br />
+          <strong>End:</strong> the first frame they are clearly no longer riding the board: a
+          hand, knee or body in the water, the board separating, the feet going behind the face
+          into the whitewater, or exiting over a side wall. A landed air is part of the ride; a
+          failed air ends when they hit the water.<br />
+          <span class="muted">Within a second is fine: clips have padding, and the evaluation
+          checks that nothing is cut off.</span>
+        </p>
+      </details>
       <details class="help">
         <summary>Keyboard shortcuts</summary>
         <p>

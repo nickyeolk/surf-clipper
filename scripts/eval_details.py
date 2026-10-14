@@ -42,7 +42,9 @@ def main() -> None:
         used.add(best[1])
         r = rides[best[1]]
         ds, de = r.start_s - lab.start_s, r.end_s - lab.end_s
-        if max(abs(ds), abs(de)) >= args.min_err:
+        cut = ds > 1.0 + 1e-6 or de < -1.5 - 1e-6  # clip padding is 1 s before, 1.5 s after
+        if cut or max(abs(ds), abs(de)) >= args.min_err:
+            print("CUT  " if cut else "     ", end="")
             print(
                 f"{r.ride_id}  label {fmt_time(lab.start_s)}-{fmt_time(lab.end_s)}  "
                 f"start {ds:+6.2f}s  end {de:+6.2f}s  ({r.start_kind}, label origin {lab.origin})"

@@ -342,20 +342,26 @@ def eval_cmd(
         [Span(r.start_s, r.end_s) for r in rides.rides],
         labels.rides,
         min_length_s=rides.settings.min_length_s,
+        pad_before_s=rides.settings.pad_before_s,
+        pad_after_s=rides.settings.pad_after_s,
     )
     if as_json:
         typer.echo(json.dumps(m.__dict__, indent=2))
         return
     added = sum(1 for r in labels.rides if r.origin == "added")
+    acid = sorted(m.acid_start_errs)
     typer.echo(
-        f"recall {m.recall:.1%} ({m.n_labels - len(m.missed)}/{m.n_labels}, target >= 95%)\n"
-        f"precision {m.precision:.1%} ({m.n_detected - len(m.false_rides)}/{m.n_detected}, "
-        f"target >= 90%)\n"
-        f"start error median {m.start_err_median:.2f}s p95 {m.start_err_p95:.2f}s; "
-        f"end error median {m.end_err_median:.2f}s p95 {m.end_err_p95:.2f}s "
-        f"(targets 0.5 s / 1 s)\n"
-        f"acid-drop start errors: {', '.join(f'{e:.2f}s' for e in m.acid_start_errs) or 'none'}\n"
-        f"labels added by user (tool misses): {added}"
+        f"recall      {m.recall:6.1%}  ({m.n_labels - len(m.missed)}/{m.n_labels})  "
+        f"target >= 95%\n"
+        f"precision   {m.precision:6.1%}  ({m.n_detected - len(m.false_rides)}/{m.n_detected})  "
+        f"target >= 90%\n"
+        f"complete    {m.completeness:6.1%}  ({m.n_labels - len(m.incomplete)}/{m.n_labels} rides "
+        f"fully inside their clip)  target >= 95%\n"
+        f"tightness   {m.overhang_p95:5.2f} s  (clip beyond the ride, p95)  target <= 3 s\n"
+        f"diagnostics: start error p95 {m.start_err_p95:.2f}s, end error p95 "
+        f"{m.end_err_p95:.2f}s; acid-drop start error p95 "
+        f"{(acid[int(0.95 * (len(acid) - 1))] if acid else 0):.2f}s; "
+        f"rides the user added (tool misses): {added}"
     )
 
 

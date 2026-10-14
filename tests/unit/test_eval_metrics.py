@@ -48,6 +48,29 @@ def test_boundary_errors_and_acid_drops_reported_separately() -> None:
     assert m.end_err_p95 == pytest.approx(0.2, abs=1e-9)
 
 
+def test_completeness_allows_up_to_the_padding() -> None:
+    labels = [LabelRide(start_s=10, end_s=30), LabelRide(start_s=50, end_s=70)]
+    # 1st: starts 0.9 s late, ends 1.4 s early: still inside the padded clip.
+    # 2nd: ends 3 s early: the clip cuts off the last 1.5 s.
+    m = evaluate([Span(10.9, 28.6), Span(50, 67)], labels, pad_before_s=1.0, pad_after_s=1.5)
+    assert m.completeness == 0.5
+    assert m.incomplete == [1]
+
+
+def test_missed_ride_is_incomplete() -> None:
+    labels = [LabelRide(start_s=10, end_s=30), LabelRide(start_s=50, end_s=70)]
+    m = evaluate([Span(10, 30)], labels, pad_before_s=1.0, pad_after_s=1.5)
+    assert m.completeness == 0.5
+
+
+def test_tightness_is_clip_overhang_beyond_the_label() -> None:
+    labels = [LabelRide(start_s=10, end_s=30)]
+    # Detected 2 s early and 1 s late: clip starts 3 s early, ends 2.5 s late.
+    m = evaluate([Span(8, 31)], labels, pad_before_s=1.0, pad_after_s=1.5)
+    assert m.overhang_p95 == pytest.approx(3.0)
+    assert m.completeness == 1.0
+
+
 def test_no_detections_and_no_labels() -> None:
     m = evaluate([], [])
     assert m.recall == 1.0 and m.precision == 1.0
