@@ -217,6 +217,11 @@ video {
 .v-add {
   background: var(--add);
 }
+.rule {
+  border-left: 3px solid var(--accent);
+  padding: 4px 8px;
+  background: var(--panel);
+}
 details.help {
   margin-top: 6px;
   color: var(--muted);

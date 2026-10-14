@@ -138,6 +138,8 @@ and confirm every edit is still present.
 - Night sessions under coloured LED lighting, and HDR recordings: analysis is not degraded by
   washed-out or tinted frames; clips keep the source's HDR.
 - Heavy motion blur on close, fast rides: the ride is not broken into pieces.
+- A rider washed over the back of the wave who stays upright on the board in the whitewater: the
+  ride ends when they leave the face, not when they fall or stop.
 - Far riders as small as about 30 px tall at 720p (0.5x, head-on): still detected.
 - Frame rates from about 24 to 120 fps, constant or variable (the HDR sample averages 25.7 fps):
   timing stays correct.
@@ -197,9 +199,13 @@ and confirm every edit is still present.
   people in the water not riding a board, in the off state regardless of how long they stay.
 - **FR-014**: During lessons, System MUST treat only the person standing on a board as the rider
   and flag those rides "lesson".
-- **FR-015**: System MUST end a ride on its last on-wave frame (fall, exit over a side wall, or
-  leaving the zone), allow changeover overlaps, and treat a same-edge frame-edge exit and return
-  within the grace window (default 2 s) as one ride.
+- **FR-015**: System MUST end a ride on its last on-wave frame: the last frame the rider is on the
+  wave face (a fall, being washed over the back of the wave, an exit over a side wall, or leaving
+  the zone). Time in the whitewater behind the wave, upright or not, is not part of the ride. It
+  MUST allow changeover overlaps, and treat a same-edge frame-edge exit and return within the
+  grace window (default 2 s) as one ride. On-wave therefore also requires the feet to be on the
+  wave face: a band of the zone estimated per session from where riders' feet cluster, shown for
+  checking and adjustable with the zone.
 - **FR-016**: System MUST join a ride split by a camera-epoch boundary back into one ride.
 - **FR-017**: System MUST refine each ride's start and end at the source's full frame rate.
 - **FR-018**: System MUST drop rides shorter than the minimum length (default 10 s, set by the user
@@ -312,5 +318,8 @@ HDR and held-out sessions), not only on average.
 - Q: Where do riders enter the wave? → A: Only from the side walls, never the back wall
   (FR-004, FR-010–FR-013, FR-015). When the entry wall is out of frame, the ride starts at the
   rider's first appearance (User Story 1, scenario 7).
+- Q: When does a ride end? → A: At the last frame the rider is on the wave face. Falling, or
+  being washed over the back into the whitewater, ends it even if the rider is still upright on
+  the board; whitewater time is not part of the ride (FR-015; also the labelling rule).
 - Q: Which sessions form the evaluation set? → A: `20260928_IMG_1652`, `20240924`, `20241004`,
   `20261012_110549566`, plus the staged bump session (Assumptions).

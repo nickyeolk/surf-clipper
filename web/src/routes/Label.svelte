@@ -241,6 +241,12 @@
         they're riding. Blue shading = watched for missed rides
         ({clock(work.scanned_to_s)} of {clock(duration)}).
       </p>
+      <p class="small rule">
+        <strong>Labelling rule:</strong> a ride starts at the drop-in (or first appearance, if the
+        side wall is out of shot) and <strong>ends at the last frame on the wave face</strong>:
+        a fall, being washed over the back, or exiting over a side wall. Whitewater time behind
+        the wave is not part of the ride, even if the rider is still upright.
+      </p>
       <details class="help">
         <summary>Keyboard shortcuts</summary>
         <p>

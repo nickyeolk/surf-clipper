@@ -46,6 +46,7 @@ Validation: reject before processing if duration > 1.5 h or codec unsupported (s
 | corners | {back_a, back_b, front_a, front_b} → image point in **source display pixels** (full resolution after rotation; detections are scaled up from the analysis frame before comparison) | by role, never by image side; may lie outside the frame. Side wall `a` = back_a→front_a, `b` = back_b→front_b |
 | entry_walls | subset of {side_a, side_b} | walls riders drop in from; default both (riders never enter over the back wall) |
 | side_areas | list of polygons (image px) | where people wait on the side walls/decks |
+| face_v | (v_min, v_max) or null | the wave face as a band of pool depth; on-wave requires the feet inside it. Null: estimated per session from riders' feet (written to `face.json`) |
 | image_to_pool | 3×3 | derived from corners |
 | undistort | params or null | ultra-wide correction (*should*) |
 | origin | `proposed` / `auto_remap` | how the candidate was produced |
