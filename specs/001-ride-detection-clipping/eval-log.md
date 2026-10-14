@@ -44,3 +44,26 @@ runs on the CPU).
 
 User validates `labels/rides/<session>.csv` (proposed by the tool), then
 `surfclip labels import` and `surfclip eval` give SC-001..SC-003 per session.
+
+## 2026-10-15 — first labelled evaluation, all four sessions
+
+Labels: proposed by the tool, validated by the user in the label screen (miss scan: 20240924
+whole hour; 20241004 to 17 min; 20260928_IMG_1652 to 27 min; 20261012 to 45 min, so recall
+beyond those points is unproven). Lesson rides count as rides (user decision B); the 20241004
+lesson labels (0:00-2:35) are unverified tool proposals. SC-003 now measures clip completeness
+(>= 95% of rides inside their padded clip) and tightness (<= 3 s overhang at p95).
+
+| Session | Recall | Precision | Complete | Tightness |
+| --- | --- | --- | --- | --- |
+| 20240924 | 100% | 100% | 93.7% | 1.50 s |
+| 20241004 | 96.4% | 97.6% | 91.6% | 1.50 s |
+| 20260928_IMG_1652 | 96.2% | 91.1% | 77.4% | 1.90 s |
+| 20261012_110549566 | 100% | 98.9% | 89.7% | 1.92 s |
+
+Fixes driven by the labels (20240924 complete/end error before -> after where measured):
+wall touches and stalls no longer split rides (end error p95 11.7 -> 1.0 s); identity
+switches mid-ride joined; riders cut off at a side edge continue their ride; lesson riders are
+not merged by the label containment rule; wall holds up to 10 s.
+
+Open: portrait session rides split (starts 11-23 s late, ends 7-13 s early); three rides
+cut 10-23 s short (20240924 28:04, 20261012 27:08 and 53:22, 20241004 56:03).
