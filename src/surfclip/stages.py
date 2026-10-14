@@ -7,12 +7,14 @@ Until zone proposal exists (US2), the rides stage needs a zone confirmed with
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import math
 import time
 from collections import defaultdict
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
@@ -53,6 +55,20 @@ if TYPE_CHECKING:  # the detector pulls in torch and YOLO; import it only when d
     from surfclip.detect.detector import Detector
 
 log = logging.getLogger(__name__)
+
+_PKG = Path(__file__).resolve().parent
+
+
+def source_version(*relative: str) -> str:
+    """Fingerprint of the source files a stage's output depends on, for its cache key, so a
+    code change re-runs exactly the stages it affects (a hand-bumped version was forgotten
+    on 2026-10-14 and a stale rides.json was evaluated)."""
+    digest = hashlib.sha256()
+    for rel in relative:
+        for path in sorted(_PKG.glob(rel)):
+            digest.update(path.relative_to(_PKG).as_posix().encode())
+            digest.update(path.read_bytes())
+    return digest.hexdigest()[:12]
 
 
 class ZoneNotConfirmedError(RuntimeError):
@@ -138,7 +154,7 @@ class TrackStage(Stage):
     name: StageName = "track"
     depends_on: tuple[StageName, ...] = ("detect",)
     config_sections: tuple[str, ...] = ("track",)
-    code_version: str = "1"
+    code_version: str = field(default_factory=lambda: source_version("track/*.py"))
 
     def run(self, ctx: StageContext) -> list[str]:
         src = ctx.store.path("detections.parquet")
@@ -159,7 +175,11 @@ class RidesStage(Stage):
     name: StageName = "rides"
     depends_on: tuple[StageName, ...] = ("track",)
     config_sections: tuple[str, ...] = ("rides",)
-    code_version: str = "6"  # 6: face band, horizon; 5: activity; 4: truncated; 3: px; 2: stitch
+    code_version: str = field(
+        default_factory=lambda: source_version(
+            "rides/*.py", "edits/apply.py", "zone/geometry.py", "media/export.py", "stages.py"
+        )
+    )
 
     def extra_inputs(self, store: SessionStore) -> list[str]:
         # The confirmed zone and every ride edit change rides.json; this stage is cheap.

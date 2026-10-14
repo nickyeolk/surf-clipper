@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import csv
 import re
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
@@ -125,21 +126,64 @@ def work_from_rides(rides: Rides, source: str) -> LabelWork:
     return LabelWork(source=source, items=sorted(items, key=lambda i: i.start_s))
 
 
+CONTAIN_TOL_S = 0.5
+MIN_LABEL_S = 0.5
+
+
+def _origin(item: LabelItem) -> Origin:
+    if item.verdict == "add" or item.detected_as is None:
+        return "added"
+    moved = (
+        item.proposed_start_s is not None
+        and item.proposed_end_s is not None
+        and (
+            abs(item.start_s - item.proposed_start_s) > 1e-3
+            or abs(item.end_s - item.proposed_end_s) > 1e-3
+        )
+    )
+    return "corrected" if moved or item.verdict == "fix" else "accepted"
+
+
+def contained_ids(items: Sequence[LabelItem]) -> set[str]:
+    """Kept items lying entirely within another kept item (within CONTAIN_TOL_S).
+
+    A rider who touches a side wall mid-ride can be split into two proposed rides; extending
+    the first one to the true end covers the second, which is then part of it, not a ride of
+    its own (seen on 20240924).
+    """
+    kept = [i for i in items if i.verdict != "no"]
+    inside: set[str] = set()
+    for inner in kept:
+        for outer in kept:
+            if outer is inner or outer.id in inside:
+                continue
+            longer = (outer.end_s - outer.start_s) > (inner.end_s - inner.start_s)
+            if (
+                longer
+                and outer.start_s - CONTAIN_TOL_S <= inner.start_s
+                and inner.end_s <= outer.end_s + CONTAIN_TOL_S
+            ):
+                inside.add(inner.id)
+                break
+    return inside
+
+
 def finalize(work: LabelWork) -> SessionLabels:
     if work.remaining:
         raise LabelError(f"{work.remaining} rides still need a verdict")
+    inside = contained_ids(work.items)
     rides: list[LabelRide] = []
     for item in work.items:
-        if item.verdict == "no":
+        if item.verdict == "no" or item.id in inside:
             continue
-        if item.end_s <= item.start_s:
-            raise LabelError(f"{item.id}: end must be after start")
+        if item.end_s - item.start_s < MIN_LABEL_S:
+            continue  # an accidental zero-length edit
         rides.append(
             LabelRide(
                 start_s=item.start_s,
                 end_s=item.end_s,
                 acid_drop=item.acid_drop,
-                origin=_ORIGIN[item.verdict],
+                origin=_origin(item),
             )
         )
     return SessionLabels(source=work.source, rides=sorted(rides, key=lambda r: r.start_s))

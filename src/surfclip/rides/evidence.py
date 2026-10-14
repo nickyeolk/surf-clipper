@@ -52,6 +52,7 @@ class Evidence:
     region: Region
     wall: SideWall | None
     candidate: bool
+    on_face: bool = True
 
     @property
     def t(self) -> float:
@@ -122,5 +123,5 @@ def classify(
         candidate = (
             region == "zone" and on_face and on_board and o.stance in ("standing", "crouched")
         )
-        out.append(Evidence(o, u, v, region, wall, candidate))
+        out.append(Evidence(o, u, v, region, wall, candidate, on_face))
     return out

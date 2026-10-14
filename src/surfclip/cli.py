@@ -18,7 +18,15 @@ from surfclip import __version__
 from surfclip.config import DEFAULT_CONFIG_PATH, ConfigError, load_config
 from surfclip.detect.errors import ModelMissingError
 from surfclip.edits.log import append_edit
-from surfclip.eval.labels import LabelError, SessionLabels, import_csv, propose
+from surfclip.eval.labels import (
+    LabelError,
+    LabelWork,
+    SessionLabels,
+    contained_ids,
+    finalize,
+    import_csv,
+    propose,
+)
 from surfclip.eval.metrics import Span, evaluate
 from surfclip.media.export import export_rides
 from surfclip.media.probe import UnsupportedInputError, probe
@@ -300,6 +308,20 @@ def labels_import(csv_file: Path, video_name: Annotated[str, typer.Option("--vid
     out = csv_file.with_suffix(".json")
     out.write_text(labels.model_dump_json(indent=2), encoding="utf-8")
     typer.echo(f"{len(labels.rides)} labelled rides -> {out}")
+
+
+@labels_app.command("finalize")
+def labels_finalize(work_file: Path) -> None:
+    """Re-write labels/rides/<name>.json from its .work.json (e.g. after a rule change)."""
+    work = LabelWork.model_validate_json(work_file.read_text(encoding="utf-8"))
+    try:
+        labels = finalize(work)
+    except LabelError as exc:
+        raise _fail(str(exc), 2) from exc
+    out = work_file.with_name(work_file.name.replace(".work.json", ".json"))
+    out.write_text(labels.model_dump_json(indent=2), encoding="utf-8")
+    inside = len(contained_ids(work.items))
+    typer.echo(f"{len(labels.rides)} labelled rides -> {out} ({inside} merged into longer rides)")
 
 
 @app.command("eval")

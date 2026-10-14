@@ -40,6 +40,16 @@
   const shown = $derived(onlyPending ? items.filter((i) => i.verdict === '?') : items)
   const selected = $derived(items.find((i) => i.id === selectedId) ?? null)
   const remaining = $derived(items.filter((i) => i.verdict === '?').length)
+  // Rides lying entirely inside a longer kept ride count as part of it (same rule as finalize).
+  const inside = $derived.by(() => {
+    const kept = items.filter((i) => i.verdict !== 'no')
+    const ids = new Set<string>()
+    for (const a of kept)
+      for (const b of kept)
+        if (a !== b && b.end_s - b.start_s > a.end_s - a.start_s &&
+            b.start_s - 0.5 <= a.start_s && a.end_s <= b.end_s + 0.5) ids.add(a.id)
+    return ids
+  })
   const zoomFrom = $derived(Math.max(0, Math.min(current - ZOOM_S / 2, duration - ZOOM_S)))
 
   // ---- saving -------------------------------------------------------------------------------
@@ -131,9 +141,18 @@
     stopAt = selected.end_s + 1.5
     void video.play()
   }
+  function moved(it: LabelItem): boolean {
+    return (
+      it.proposed_start_s !== null &&
+      it.proposed_end_s !== null &&
+      (Math.abs(it.start_s - it.proposed_start_s) > 1e-3 || Math.abs(it.end_s - it.proposed_end_s) > 1e-3)
+    )
+  }
   function verdict(v: LabelItem['verdict']) {
     if (!selected) return
-    selected.verdict = selected.detected_as === null && v !== 'no' ? 'add' : v
+    if (selected.detected_as === null && v !== 'no') v = 'add'
+    else if (v === 'ok' && moved(selected)) v = 'fix' // times were changed: keep it "corrected"
+    selected.verdict = v
     changed()
     if (v !== '?') move(1)
   }
@@ -318,6 +337,7 @@
               <span class="muted">{(it.end_s - it.start_s).toFixed(1)}s</span>
               <span class="muted">{it.detected_as ?? 'added'}</span>
               {#if it.acid_drop}<span class="tag">acid</span>{/if}
+              {#if inside.has(it.id)}<span class="tag" title="Inside a longer ride: counted as part of it">part of ride</span>{/if}
             </button>
           </li>
         {/each}

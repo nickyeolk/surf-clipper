@@ -1,0 +1,523 @@
+{
+  "schema_version": "1.0.0",
+  "source": "20240924.MP4",
+  "rides": [
+    {
+      "start_s": 0.0,
+      "end_s": 52.8,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 59.2,
+      "end_s": 87.282939,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 102.2,
+      "end_s": 135.8,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 147.8,
+      "end_s": 201.8,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 210.8,
+      "end_s": 257.6,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 270.6,
+      "end_s": 276.8,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 287.2,
+      "end_s": 300.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 308.2,
+      "end_s": 330.0,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 335.8,
+      "end_s": 369.4,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 376.0,
+      "end_s": 397.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 405.8,
+      "end_s": 464.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 475.2,
+      "end_s": 494.4,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 500.8,
+      "end_s": 542.638287,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 548.8,
+      "end_s": 581.4,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 593.2,
+      "end_s": 602.8,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 606.591742,
+      "end_s": 657.6,
+      "acid_drop": true,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 657.7470666666667,
+      "end_s": 698.821902,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 703.6,
+      "end_s": 734.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 744.2,
+      "end_s": 810.8,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 819.2,
+      "end_s": 842.2,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 851.8,
+      "end_s": 872.8,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 878.8,
+      "end_s": 901.4,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 913.4,
+      "end_s": 932.4,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 937.2,
+      "end_s": 970.6,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 976.0,
+      "end_s": 1020.6,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1026.6,
+      "end_s": 1055.8,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1064.6,
+      "end_s": 1092.6,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1102.4,
+      "end_s": 1120.8,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1131.2,
+      "end_s": 1161.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1168.0,
+      "end_s": 1235.4,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1247.4,
+      "end_s": 1281.4,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1285.6,
+      "end_s": 1306.0,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1312.8,
+      "end_s": 1353.166663,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 1359.0,
+      "end_s": 1382.6,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1391.8,
+      "end_s": 1429.4,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1437.6,
+      "end_s": 1482.4,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1489.0,
+      "end_s": 1533.8,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1540.4,
+      "end_s": 1602.2,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1615.4,
+      "end_s": 1646.707632,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 1651.8,
+      "end_s": 1675.0,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1684.0,
+      "end_s": 1739.094081,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 1744.0,
+      "end_s": 1761.8,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1771.0,
+      "end_s": 1804.6,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1811.6,
+      "end_s": 1841.4,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1851.8,
+      "end_s": 1856.2,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1863.8,
+      "end_s": 1924.2,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1935.0,
+      "end_s": 1943.6,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 1950.2,
+      "end_s": 1999.2,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2005.0,
+      "end_s": 2028.2,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2035.8,
+      "end_s": 2056.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2064.0,
+      "end_s": 2121.2,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2127.8,
+      "end_s": 2143.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2152.8,
+      "end_s": 2184.422883,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 2191.2,
+      "end_s": 2262.6,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2273.6,
+      "end_s": 2281.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2285.0,
+      "end_s": 2326.2,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2331.4,
+      "end_s": 2369.063848,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 2374.6,
+      "end_s": 2405.8,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2415.6,
+      "end_s": 2470.4,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2477.4,
+      "end_s": 2500.925219,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 2514.8,
+      "end_s": 2579.6,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2591.8,
+      "end_s": 2597.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2604.0,
+      "end_s": 2620.0,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2627.4,
+      "end_s": 2661.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2666.4,
+      "end_s": 2716.2,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2726.0,
+      "end_s": 2800.299256,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 2806.8,
+      "end_s": 2837.6,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2851.6,
+      "end_s": 2884.2,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2897.8,
+      "end_s": 2942.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2952.6,
+      "end_s": 2966.6,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2971.2,
+      "end_s": 2991.2,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 2997.8,
+      "end_s": 3024.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3033.4,
+      "end_s": 3043.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3051.4,
+      "end_s": 3114.2,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3123.233278,
+      "end_s": 3154.8,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 3163.0,
+      "end_s": 3180.579423,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 3189.4,
+      "end_s": 3243.146758,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 3253.2,
+      "end_s": 3263.6,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3270.0,
+      "end_s": 3297.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3305.6,
+      "end_s": 3347.0,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3354.8,
+      "end_s": 3397.2,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3404.6,
+      "end_s": 3454.140491,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 3459.4,
+      "end_s": 3498.2,
+      "acid_drop": false,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3503.0,
+      "end_s": 3539.6,
+      "acid_drop": true,
+      "origin": "accepted"
+    },
+    {
+      "start_s": 3545.8,
+      "end_s": 3584.933052,
+      "acid_drop": false,
+      "origin": "corrected"
+    },
+    {
+      "start_s": 3589.6,
+      "end_s": 3603.6,
+      "acid_drop": false,
+      "origin": "accepted"
+    }
+  ],
+  "camera_shifts_s": []
+}

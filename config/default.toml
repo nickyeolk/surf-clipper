@@ -54,7 +54,10 @@ confirm_window_s = 1.5
 min_lateral_speed_pool = 0.03 # pool units per second along the wave (path length / time)
 evidence_gap_s = 1.5          # brief losses of on-wave evidence (blur, spray, board out of shot)
                               # do not end a ride; close HDR rides lose the board ~half the time
-wall_band_in_pool = 0.0       # a side wall's band reaches this far into the pool (0: riders
+upright_bridge_s = 4.0        # upright in the pool (on the face or against a side wall) without a
+                              # visible board keeps a ride going this long (hand on the wall,
+                              # 20240924); falls, exits and whitewater still end it
+wall_band_in_pool = 0.0      # a side wall's band reaches this far into the pool (0: riders
                               # carve right up to the wall, 20261012)...
 wall_band_out_pool = 0.25     # ...and this far beyond it (feet on the wall top project outward)
 zone_margin_pool = 0.05       # tolerance around the zone's back and front edges

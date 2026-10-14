@@ -91,12 +91,24 @@ def test_brief_evidence_gap_does_not_split_ride() -> None:
     assert len(rides) == 1
 
 
-def test_long_evidence_gap_splits_ride() -> None:
+def test_long_gap_without_upright_evidence_splits_ride() -> None:
     obs = track(
         1,
         0.0,
         ride_segment(6.0, 0.1, 0.4),
-        Seg(2.0, 0.4, 0.42, board=False),
+        Seg(2.0, 0.4, 0.42, board=False, stance="unknown"),  # not seen upright: down
+        ride_segment(6.0, 0.42, 0.8),
+    )
+    _, rides = _rides(obs)
+    assert len(rides) == 2
+
+
+def test_upright_bridge_has_a_limit() -> None:
+    obs = track(
+        1,
+        0.0,
+        ride_segment(6.0, 0.1, 0.4),
+        Seg(5.0, 0.4, 0.42, board=False),  # upright but no board for 5 s (> 4 s bridge)
         ride_segment(6.0, 0.42, 0.8),
     )
     _, rides = _rides(obs)
@@ -119,6 +131,49 @@ def test_rider_carving_next_to_a_side_wall_stays_riding() -> None:
     obs = track(1, 0.0, ride_segment(6.0, 0.5, 0.98), ride_segment(6.0, 0.98, 0.5))
     _, rides = _rides(obs)
     assert len(rides) == 1
+
+
+def test_hand_on_the_wall_while_upright_stays_one_ride() -> None:
+    """20240924: a rider crouches against a side wall, board hidden, then rides on."""
+    obs = track(
+        1,
+        0.0,
+        ride_segment(8.0, 0.3, 0.97),
+        Seg(1.6, 0.97, 0.99, board=False, stance="crouched"),
+        Seg(0.2, 1.01, 1.01, board=True),  # one frame on the wall band
+        Seg(0.4, 0.99, 0.99, board=False),
+        ride_segment(8.0, 0.98, 0.3),
+    )
+    _, rides = _rides(obs)
+    assert len(rides) == 1
+    assert rides[0].end_t == pytest.approx(obs[-1].t)
+
+
+def test_deep_crouch_read_as_sitting_stays_one_ride() -> None:
+    """20240924 39:19: a low carve makes the box wide; it reads as sitting for under a second."""
+    obs = track(
+        1,
+        0.0,
+        ride_segment(8.0, 0.3, 0.6),
+        Seg(0.2, 0.6, 0.6, board=False, stance="sitting"),
+        Seg(0.6, 0.6, 0.62, board=True, stance="sitting"),
+        Seg(0.6, 0.62, 0.6, board=False, stance="standing"),
+        ride_segment(8.0, 0.6, 0.2),
+    )
+    _, rides = _rides(obs)
+    assert len(rides) == 1
+
+
+def test_fall_with_a_gap_still_splits() -> None:
+    obs = track(
+        1,
+        0.0,
+        ride_segment(8.0, 0.3, 0.9),
+        Seg(2.5, 0.9, 0.9, board=False, stance="sitting"),  # down in the water
+        ride_segment(8.0, 0.9, 0.3),
+    )
+    _, rides = _rides(obs)
+    assert len(rides) == 2
 
 
 FACE = (0.3, 0.6)
