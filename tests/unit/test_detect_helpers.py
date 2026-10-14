@@ -59,6 +59,37 @@ def test_board_held_overhead_is_not_under_feet() -> None:
     assert match_boards([person], [held], CFG) == [None]
 
 
+def test_association_box_scaling_round_trips() -> None:
+    from surfclip.track.tracker import scale_boxes
+
+    boxes = np.array([[100.0, 50.0, 200.0, 250.0]])
+    big = scale_boxes(boxes, 2.5)
+    assert big.tolist() == [[25.0, -100.0, 275.0, 400.0]]
+    assert np.allclose(scale_boxes(big, 1 / 2.5), boxes)
+
+
+def test_fast_rider_is_one_track() -> None:
+    """A rider moving 0.7 box widths per frame keeps one id (it broke without box scaling)."""
+    from surfclip.detect.detector import FrameDetections
+    from surfclip.track.tracker import AnalysedFrame, track_people
+
+    frames = [
+        AnalysedFrame(
+            t=i * 0.2,
+            frame=i * 6,
+            detections=FrameDetections(
+                np.array([[300.0 + 70 * i, 200, 400.0 + 70 * i, 350]]),
+                np.array([0.9]),
+                np.array([0]),
+            ),
+        )
+        for i in range(10)
+    ]
+    obs = list(track_people(frames, width=1280, height=720, fps=5, cfg=CFG))
+    assert len(obs) >= 9
+    assert len({o.track_id for o in obs}) == 1
+
+
 def test_feet_from_board_when_bottom_is_cut_off() -> None:
     box = (600.0, 400.0, 700.0, 720.0)
     board = (580.0, 690.0, 720.0, 720.0)

@@ -50,6 +50,7 @@ class TrackConfig(_Section):
     max_gap_s: float
     min_track_s: float
     match_iou: float
+    assoc_box_scale: float
     edge_margin_frac: float
     sitting_max_aspect: float
     crouched_max_aspect: float

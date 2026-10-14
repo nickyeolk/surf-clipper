@@ -30,6 +30,13 @@ def _box(row: np.ndarray) -> Box:  # type: ignore[type-arg]
     return (float(row[0]), float(row[1]), float(row[2]), float(row[3]))
 
 
+def scale_boxes(xyxy: np.ndarray, factor: float) -> np.ndarray:  # type: ignore[type-arg]
+    """Scale boxes about their centres (exactly invertible with 1 / factor)."""
+    c = (xyxy[:, :2] + xyxy[:, 2:]) / 2
+    half = (xyxy[:, 2:] - xyxy[:, :2]) / 2 * factor
+    return np.hstack([c - half, c + half])
+
+
 def track_people(
     frames: Iterable[AnalysedFrame],
     *,
@@ -48,15 +55,18 @@ def track_people(
     for af in frames:
         people, people_scores = af.detections.of("person")
         boards, _ = af.detections.of("surfboard")
+        # Enlarged boxes for matching only: fast carving riders barely overlap between frames.
         dets = sv.Detections(
-            xyxy=people.astype(np.float32),
+            xyxy=scale_boxes(people, cfg.assoc_box_scale).astype(np.float32),
             confidence=people_scores.astype(np.float32),
             class_id=np.zeros(len(people), dtype=int),
         )
         tracked = tracker.update_with_detections(dets)
         if len(tracked) == 0 or tracked.tracker_id is None:
             continue
-        boxes = [_box(r) for r in tracked.xyxy]
+        boxes = [
+            _box(r) for r in scale_boxes(tracked.xyxy.astype(np.float64), 1 / cfg.assoc_box_scale)
+        ]
         board_boxes = [_box(r) for r in boards]
         board_of = match_boards(boxes, board_boxes, cfg)
         scores = tracked.confidence if tracked.confidence is not None else np.ones(len(boxes))

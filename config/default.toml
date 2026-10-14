@@ -28,6 +28,8 @@ tile_overlap_frac = 0.2
 max_gap_s = 1.0               # keep a track alive through detection gaps up to this long
 min_track_s = 0.6
 match_iou = 0.8               # ByteTrack matching threshold
+assoc_box_scale = 2.5         # boxes are enlarged this much for matching only: at 5 fps a carving
+                              # rider moves ~0.7 box widths per frame and tiny overlaps broke tracks
 edge_margin_frac = 0.005      # box within this fraction of the frame size of an edge = touching it
 sitting_max_aspect = 0.9      # box height/width below this = sitting or lying
 crouched_max_aspect = 1.4     # below this = crouched, above = standing
