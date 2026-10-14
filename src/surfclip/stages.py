@@ -21,7 +21,7 @@ from surfclip.media.export import attach_exports, read_exports
 from surfclip.media.probe import probe
 from surfclip.pipeline import Pipeline, Stage, StageContext
 from surfclip.rides.assemble import assemble
-from surfclip.rides.evidence import Evidence, Obs, classify
+from surfclip.rides.evidence import Evidence, Obs, classify, to_source_pixels
 from surfclip.rides.state_machine import TrackRide, track_rides
 from surfclip.rides.stitch import stitch
 from surfclip.store.frames import (
@@ -138,7 +138,7 @@ class RidesStage(Stage):
     name: StageName = "rides"
     depends_on: tuple[StageName, ...] = ("track",)
     config_sections: tuple[str, ...] = ("rides",)
-    code_version: str = "2"  # 2: stitch track fragments; lesson = anyone else in the zone
+    code_version: str = "4"  # 4: bottom-truncated riders; 3: source pixels; 2: stitching
 
     def extra_inputs(self, store: SessionStore) -> list[str]:
         # The confirmed zone and every ride edit change rides.json; this stage is cheap.
@@ -152,8 +152,10 @@ class RidesStage(Stage):
                 "no confirmed zone: run `surfclip zone <video> --from-file zone.json` first"
             )
         info = store.read_model("probe.json", SourceInfo)
+        tracks_file = store.path("tracks.parquet")
+        sx, sy = source_scale(info, read_meta(tracks_file))
         by_track: dict[int, list[Obs]] = defaultdict(list)
-        for o in read_observations(store.path("tracks.parquet")):
+        for o in to_source_pixels(read_observations(tracks_file), sx, sy):
             by_track[o.track_id].append(o)
         chains, members = stitch(list(by_track.values()), cfg)
         evidence: dict[int, list[Evidence]] = {
@@ -182,6 +184,12 @@ class RidesStage(Stage):
         edited = apply_edits(detected, read_edits(store))
         store.write_model("rides.json", attach_exports(edited, read_exports(store), store))
         return ["rides.detected.json", "rides.json"]
+
+
+def source_scale(info: SourceInfo, meta: FrameMeta) -> tuple[float, float]:
+    """Factors from analysis-frame pixels to source display pixels (zones live in the latter)."""
+    width, height = output_size(info, max(info.width, info.height))
+    return width / meta.width, height / meta.height
 
 
 def default_pipeline(*, cpu: bool = False) -> Pipeline:

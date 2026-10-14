@@ -15,8 +15,9 @@ import numpy as np
 from surfclip.config import load_config
 from surfclip.edits.log import confirmed_zone, read_edits
 from surfclip.media.decode import iter_proxy_frames
-from surfclip.rides.evidence import classify
-from surfclip.store.frames import read_observations
+from surfclip.rides.evidence import classify, to_source_pixels
+from surfclip.stages import source_scale
+from surfclip.store.frames import read_meta, read_observations
 from surfclip.store.schemas import SourceInfo
 from surfclip.store.session import SessionStore
 from surfclip.zone.geometry import PoolMapping
@@ -36,14 +37,18 @@ def main() -> None:
     zone = confirmed_zone(read_edits(store))
     assert zone is not None
     mapping = PoolMapping.from_corners(zone.corners)
-    obs = read_observations(store.path("tracks.parquet"))
+    tracks_file = store.path("tracks.parquet")
+    sx, sy = source_scale(info, read_meta(tracks_file))
+    obs = read_observations(tracks_file)  # analysis-frame pixels, as drawn
     for t in args.times:
         frame = next(iter_proxy_frames(info, fps=5, max_height=720, start_s=t, duration_s=0.3))
         img = frame.image.copy()
         quad = mapping.to_image(np.array([(0, 0), (1, 0), (1, 1), (0, 1)], dtype=float))
+        quad = quad / np.array([sx, sy])  # zone is in source pixels
         cv2.polylines(img, [quad.astype(np.int32)], True, (255, 255, 0), 2)
         here = [o for o in obs if abs(o.t - frame.pts_s) < 0.11]
-        for o, ev in zip(here, classify(here, zone, cfg.rides), strict=True):
+        evs = classify(to_source_pixels(here, sx, sy), zone, cfg.rides)
+        for o, ev in zip(sorted(here, key=lambda x: x.t), evs, strict=True):
             colour = COLOURS[ev.region]
             x0, y0, x1, y1 = (int(v) for v in o.box)
             cv2.rectangle(img, (x0, y0), (x1, y1), colour, 3 if ev.candidate else 1)

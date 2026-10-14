@@ -11,9 +11,11 @@ from pathlib import Path
 
 from surfclip.config import load_config
 from surfclip.edits.log import confirmed_zone, read_edits
-from surfclip.rides.evidence import Obs, classify
+from surfclip.rides.evidence import Obs, classify, to_source_pixels
 from surfclip.rides.stitch import stitch
-from surfclip.store.frames import read_observations
+from surfclip.stages import source_scale
+from surfclip.store.frames import read_meta, read_observations
+from surfclip.store.schemas import SourceInfo
 from surfclip.store.session import SessionStore
 
 
@@ -29,7 +31,9 @@ def main() -> None:
     zone = confirmed_zone(read_edits(store))
     assert zone is not None
     by_track: dict[int, list[Obs]] = defaultdict(list)
-    for o in read_observations(store.path("tracks.parquet")):
+    tracks_file = store.path("tracks.parquet")
+    sx, sy = source_scale(store.read_model("probe.json", SourceInfo), read_meta(tracks_file))
+    for o in to_source_pixels(read_observations(tracks_file), sx, sy):
         if args.start - 5 <= o.t <= args.end + 5:
             by_track[o.track_id].append(o)
     chains, members = stitch(list(by_track.values()), cfg)

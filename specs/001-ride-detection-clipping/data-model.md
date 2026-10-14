@@ -43,7 +43,7 @@ Validation: reject before processing if duration > 1.5 h or codec unsupported (s
 | Field | Type | Notes |
 | --- | --- | --- |
 | epoch_id | int | |
-| corners | {back_a, back_b, front_a, front_b} → image point | by role, never by image side; may lie outside the frame. Side wall `a` = back_a→front_a, `b` = back_b→front_b |
+| corners | {back_a, back_b, front_a, front_b} → image point in **source display pixels** (full resolution after rotation; detections are scaled up from the analysis frame before comparison) | by role, never by image side; may lie outside the frame. Side wall `a` = back_a→front_a, `b` = back_b→front_b |
 | entry_walls | subset of {side_a, side_b} | walls riders drop in from; default both (riders never enter over the back wall) |
 | side_areas | list of polygons (image px) | where people wait on the side walls/decks |
 | image_to_pool | 3×3 | derived from corners |

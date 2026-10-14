@@ -13,9 +13,10 @@ import numpy as np
 
 from surfclip.config import load_config
 from surfclip.edits.log import confirmed_zone, read_edits
-from surfclip.rides.evidence import Obs, classify
+from surfclip.rides.evidence import Obs, classify, to_source_pixels
+from surfclip.stages import source_scale
 from surfclip.store.frames import read_meta, read_observations
-from surfclip.store.schemas import Rides
+from surfclip.store.schemas import Rides, SourceInfo
 from surfclip.store.session import SessionStore
 
 
@@ -27,7 +28,9 @@ def main() -> None:
     store = SessionStore.open(args.video, args.artifacts)
     cfg = load_config(overrides=store.session.config_overrides)
     meta = read_meta(store.path("tracks.parquet"))
-    obs = read_observations(store.path("tracks.parquet"))
+    info = store.read_model("probe.json", SourceInfo)
+    sx, sy = source_scale(info, meta)
+    obs = to_source_pixels(read_observations(store.path("tracks.parquet")), sx, sy)
     print(f"frame {meta.width}x{meta.height} @ {meta.fps} fps; {len(obs)} observations")
     ts = np.array([o.t for o in obs])
     print(f"time range {ts.min():.1f}..{ts.max():.1f} s")

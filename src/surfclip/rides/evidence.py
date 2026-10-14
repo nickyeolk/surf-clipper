@@ -2,14 +2,16 @@
 
 Every observation is placed in pool coordinates from its feet point. A person counts as a
 riding *candidate* only when their feet are inside the wave zone, they are standing or crouched,
-and a board is under their feet. People on an entry side wall (sitting, standing, holding a
-board) are never candidates, however much their box overlaps the wave in the image.
+and a board is under their feet. When the box is cut off by the bottom of the frame (close
+cameras, e.g. 20261012), the board is out of shot, so standing in the zone is enough. People on
+an entry side wall (sitting, standing, holding a board) are never candidates, however much their
+box overlaps the wave in the image.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 import numpy as np
@@ -64,7 +66,30 @@ def _wall(u: float, cfg: RidesConfig) -> SideWall | None:
     return None
 
 
+def to_source_pixels(observations: Sequence[Obs], sx: float, sy: float) -> list[Obs]:
+    """Scale analysis-frame observations to the source's displayed resolution.
+
+    Zones are drawn on full-resolution keyframes (the picture the user sees), while detection
+    runs on frames shrunk to the analysis height. Found on 2026-10-14: portrait and 1080p
+    sessions produced no rides because the two were compared at different scales.
+    """
+    if sx == 1.0 and sy == 1.0:
+        return list(observations)
+    return [
+        replace(
+            o,
+            box=(o.box[0] * sx, o.box[1] * sy, o.box[2] * sx, o.box[3] * sy),
+            feet=(o.feet[0] * sx, o.feet[1] * sy),
+        )
+        for o in observations
+    ]
+
+
 def classify(observations: Sequence[Obs], zone: Zone, cfg: RidesConfig) -> list[Evidence]:
+    """Evidence for one track's observations, sorted by time.
+
+    Observations and zone must be in the same pixel space: source display pixels.
+    """
     """Evidence for one track's observations, sorted by time."""
     obs = sorted(observations, key=lambda o: o.t)
     if not obs:
@@ -83,6 +108,7 @@ def classify(observations: Sequence[Obs], zone: Zone, cfg: RidesConfig) -> list[
             region = "zone"
         else:
             region = "outside"
-        candidate = region == "zone" and o.board and o.stance in ("standing", "crouched")
+        on_board = o.board or o.edge == "bottom"  # board below the frame edge
+        candidate = region == "zone" and on_board and o.stance in ("standing", "crouched")
         out.append(Evidence(o, u, v, region, wall, candidate))
     return out

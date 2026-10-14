@@ -108,6 +108,19 @@ def test_standing_still_on_board_is_not_riding() -> None:
     assert rides == []
 
 
+def test_rider_cut_off_at_frame_bottom_counts_without_visible_board() -> None:
+    """Close cameras (20261012) cut off the feet and board; standing in the zone is enough."""
+    obs = track(1, 0.0, ride_segment(12.0, board=False, edge="bottom"))
+    _, rides = _rides(obs)
+    assert len(rides) == 1
+
+
+def test_rider_carving_next_to_a_side_wall_stays_riding() -> None:
+    obs = track(1, 0.0, ride_segment(6.0, 0.5, 0.98), ride_segment(6.0, 0.98, 0.5))
+    _, rides = _rides(obs)
+    assert len(rides) == 1
+
+
 def test_mirrored_scene_gives_same_rides() -> None:
     obs = track(1, 0.0, sitting_on_wall(3.0, u=1.05), ride_segment(12.0, 0.92, 0.3))
     _, rides = _rides(obs)
