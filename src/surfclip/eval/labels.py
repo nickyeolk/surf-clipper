@@ -149,7 +149,8 @@ def contained_ids(items: Sequence[LabelItem]) -> set[str]:
 
     A rider who touches a side wall mid-ride can be split into two proposed rides; extending
     the first one to the true end covers the second, which is then part of it, not a ride of
-    its own (seen on 20240924).
+    its own (seen on 20240924). Only an outer ride the user extended or added absorbs others:
+    simultaneous riders (a group lesson, 20241004) overlap without anyone editing anything.
     """
     kept = [i for i in items if i.verdict != "no"]
     inside: set[str] = set()
@@ -160,6 +161,7 @@ def contained_ids(items: Sequence[LabelItem]) -> set[str]:
             longer = (outer.end_s - outer.start_s) > (inner.end_s - inner.start_s)
             if (
                 longer
+                and _origin(outer) in ("corrected", "added")
                 and outer.start_s - CONTAIN_TOL_S <= inner.start_s
                 and inner.end_s <= outer.end_s + CONTAIN_TOL_S
             ):

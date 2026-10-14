@@ -45,6 +45,13 @@ def test_ride_inside_another_is_part_of_it_not_a_second_ride() -> None:
     assert [(r.start_s, r.end_s) for r in labels.rides] == [(100.0, 160.0), (200.0, 230.0)]
 
 
+def test_simultaneous_lesson_rides_are_not_merged() -> None:
+    """20241004: beginners on one pole ride at the same time; nobody extended anything."""
+    work = work_from_rides(Rides.model_validate(EXAMPLE), "x.mp4")
+    work.items = [_item("r1", 0.0, 50.0), _item("r2", 6.0, 27.0), _item("r3", 31.0, 74.0)]
+    assert len(finalize(work).rides) == 3
+
+
 def test_changed_times_count_as_corrected_even_if_marked_ok() -> None:
     work = work_from_rides(Rides.model_validate(EXAMPLE), "x.mp4")
     work.items = [_item("r1", 100.0, 160.0, proposed_end_s=130.0), _item("r2", 200, 230)]
