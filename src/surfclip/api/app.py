@@ -27,7 +27,7 @@ from surfclip.media.export import export_rides, read_exports
 from surfclip.media.review import thumbnail
 from surfclip.store.schemas import EditTarget, Rides, Session, SourceInfo, UserEdit, Zone
 from surfclip.store.session import SessionStore
-from surfclip.zone.editing import confirm_zone, display_size, keyframe, rider_feet
+from surfclip.zone.editing import confirm_zone, display_size, keyframe, rider_feet, zone_proposal
 from surfclip.zone.geometry import GeometryError
 
 
@@ -216,6 +216,7 @@ def create_app(
         store = store_of(sid)
         info: SourceInfo = read(folder(sid) / "probe.json", SourceInfo)
         zone = confirmed_zone(read_edits(store))
+        proposal = zone_proposal(store)
         face_file = folder(sid) / "face.json"
         width, height = display_size(info)
         return {
@@ -225,6 +226,7 @@ def create_app(
             else None,
             "frame": {"width": width, "height": height, "duration_s": info.duration_s},
             "feet": rider_feet(store),
+            "proposal": proposal.model_dump(mode="json") if proposal else None,
         }
 
     @app.put("/api/sessions/{sid}/zone")

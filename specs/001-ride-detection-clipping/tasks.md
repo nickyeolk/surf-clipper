@@ -101,12 +101,12 @@ time it (SC-004), and compare with the hand-made zone file from US1
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T034 [P] [US2] Unit tests for zone proposal on synthetic foot-point clouds (camera left, right, head-on): corners returned by role, both orientations tried, low-density input → `unreliable`, in tests/unit/test_zone_proposal.py
+- [x] T034 [P] [US2] Unit tests for zone proposal on synthetic foot-point clouds (camera left, right, head-on): corners returned by role, both orientations tried, low-density input → `unreliable`, in tests/unit/test_zone_proposal.py
 - [ ] T035 [P] [US2] API contract tests for `GET/PUT /sessions/{id}/epochs/{e}/zone`, `GET .../keyframe.jpg`, `POST /sessions`, `GET /jobs/{id}` (shapes per contracts/http-api.md; error format `{"error": {"code", "message"}}`) in tests/contract/test_api_zone.py
 
 ### Implementation for User Story 2
 
-- [ ] T036 [US2] Implement zone proposal (density of moving foot points → quadrilateral, both orientations, side walls placed where tracks appear and disappear, corners allowed outside the frame, entry walls, side waiting areas, `proposal_confidence`) writing zones.json and keyframes/<epoch>.jpg in src/surfclip/zone/propose.py; until T034 passes
+- [x] T036 [US2] Implement zone proposal (density of moving foot points → quadrilateral, both orientations, side walls placed where tracks appear and disappear, corners allowed outside the frame, entry walls, side waiting areas, `proposal_confidence`) writing zones.json and keyframes/<epoch>.jpg in src/surfclip/zone/propose.py; until T034 passes. *(2026-10-15: from riders only, cached in zone_proposal.json, shown in the zone editor and `surfclip zone --accept`; side waiting areas not proposed)*
 - [x] T037 [US2] Implement the FastAPI app bound to `server.host` (127.0.0.1) with error format, static serving of web/dist, and background job runner with progress/eta in src/surfclip/api/app.py and src/surfclip/api/jobs.py; add `surfclip serve` in src/surfclip/cli.py
 - [ ] T038 [US2] Implement session and zone routes per contracts/http-api.md (PUT zone appends `confirm_zone` with `how` = accepted/edited/drawn and triggers ride stages) in src/surfclip/api/routes_sessions.py and src/surfclip/api/routes_zones.py; until T035 passes
 - [x] T039 [P] [US2] Implement the typed API client in web/src/lib/api.ts

@@ -113,14 +113,34 @@ def ingest(
 @app.command()
 def zone(
     video: Path,
-    from_file: Annotated[Path, typer.Option("--from-file", help="Zone JSON to confirm.")],
+    from_file: Annotated[
+        Path | None, typer.Option("--from-file", help="Zone JSON to confirm.")
+    ] = None,
+    accept: Annotated[
+        bool, typer.Option("--accept", help="Confirm the zone proposed from riders' movement.")
+    ] = False,
     epoch: Annotated[int, typer.Option("--epoch", help="Camera epoch.")] = 0,
     artifacts: ArtifactsOpt = Path("artifacts"),
 ) -> None:
-    """Confirm the wave zone for VIDEO from a file (until the zone editor exists)."""
+    """Show the proposed wave zone for VIDEO, or confirm it (--accept) or one from a file.
+
+    Needs `surfclip analyse` first. The zone editor in the browser does the same, visually."""
+    from surfclip.zone.editing import zone_proposal
+
     try:
         store = SessionStore.open(video, artifacts)
-        z = Zone.model_validate_json(from_file.read_text(encoding="utf-8"))
+        if from_file is None:
+            proposal = zone_proposal(store)
+            if proposal is None:
+                raise _fail("no tracks yet: run `surfclip analyse` first", 2)
+            typer.echo(proposal.model_dump_json(indent=2))
+            if not accept:
+                return
+            if proposal.unreliable:
+                raise _fail("the proposal is unreliable: draw the zone in the editor", 1)
+            z = proposal.zone
+        else:
+            z = Zone.model_validate_json(from_file.read_text(encoding="utf-8"))
         z = z.model_copy(update={"epoch_id": epoch, "origin": "user"})
         PoolMapping.from_corners(z.corners)
     except (SourceLocationError, FileNotFoundError, ValidationError, GeometryError) as exc:
@@ -129,7 +149,7 @@ def zone(
         store,
         "confirm_zone",
         EditTarget(epoch_id=epoch),
-        {"zone": z.model_dump(mode="json"), "how": "file"},
+        {"zone": z.model_dump(mode="json"), "how": "file" if from_file else "accepted"},
     )
     typer.echo(f"zone confirmed for epoch {epoch} (edit {edit.edit_id})")
 

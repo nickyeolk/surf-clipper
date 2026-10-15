@@ -196,57 +196,12 @@ class RidesStage(Stage):
             raise ZoneNotConfirmedError(
                 "no confirmed zone: run `surfclip zone <video> --from-file zone.json` first"
             )
-        info = store.read_model("probe.json", SourceInfo)
-        tracks_file = store.path("tracks.parquet")
-        sx, sy = source_scale(info, read_meta(tracks_file))
-        by_track: dict[int, list[Obs]] = defaultdict(list)
-        for o in to_source_pixels(read_observations(tracks_file), sx, sy):
-            by_track[o.track_id].append(o)
-        chains, members = stitch(list(by_track.values()), cfg)
-        face = self._face(chains, zone, cfg)
+        detected, face, act = detect_rides(store, zone, cfg)
         store.write_model("face.json", face)
-        evidence: dict[int, list[Evidence]] = {
-            cid: classify(obs, zone, cfg, face=face.face_v) for cid, obs in chains.items()
-        }
-        store.write_model(
-            "activity.json", activity(evidence, info.duration_s, read_meta(tracks_file).fps)
-        )
-        trs: list[TrackRide] = [r for evs in evidence.values() for r in track_rides(evs, cfg)[1]]
-        rides, short = assemble(
-            trs, evidence, cfg=cfg, fps=info.avg_fps, duration_s=info.duration_s
-        )
-        rides = [  # report the tracker's own fragment ids, not chain ids
-            r.model_copy(update={"track_ids": [t for c in r.track_ids for t in members[c]]})
-            for r in rides
-        ]
-        detected = Rides(
-            session_id=store.session.session_id,
-            source=SourceSummary(path=info.path, fps=info.avg_fps, hdr_format=info.hdr_format),
-            settings=RideSettings(
-                min_length_s=cfg.min_length_s,
-                pad_before_s=cfg.pad_before_s,
-                pad_after_s=cfg.pad_after_s,
-            ),
-            rides=rides,
-            short_attempts=short,
-        )
+        store.write_model("activity.json", act)
         store.write_model("rides.detected.json", detected)
         rebuild_rides(store, detected)
         return ["rides.detected.json", "rides.json", "activity.json", "face.json"]
-
-    @staticmethod
-    def _face(chains: dict[int, list[Obs]], zone: Zone, cfg: RidesConfig) -> FaceBand:
-        """The user's face band if set, else estimated from a first pass without one."""
-        if zone.face_v is not None:
-            return FaceBand(face_v=zone.face_v, origin="zone", frames=0)
-        on_wave_v: list[float] = []
-        for obs in chains.values():
-            evs = classify(obs, zone, cfg)
-            states, _ = track_rides(evs, cfg)
-            on_wave_v += [
-                ev.v for ev, st in zip(evs, states, strict=True) if st == "on_wave" and ev.candidate
-            ]
-        return estimate_face(on_wave_v, cfg)
 
 
 class Activity(BaseModel):
@@ -267,6 +222,63 @@ def activity(
                 seen[min(n - 1, int(ev.t / bin_s))].add(round(ev.t, 2))
     per_bin = max(1.0, fps * bin_s)
     return Activity(bin_s=bin_s, values=[round(min(1.0, len(s) / per_bin), 2) for s in seen])
+
+
+def session_observations(store: SessionStore) -> list[Obs]:
+    """Tracked people in source display pixels (the zone's coordinates)."""
+    info = store.read_model("probe.json", SourceInfo)
+    tracks_file = store.path("tracks.parquet")
+    sx, sy = source_scale(info, read_meta(tracks_file))
+    return to_source_pixels(read_observations(tracks_file), sx, sy)
+
+
+def _face(chains: dict[int, list[Obs]], zone: Zone, cfg: RidesConfig) -> FaceBand:
+    """The user's face band if set, else estimated from a first pass without one."""
+    if zone.face_v is not None:
+        return FaceBand(face_v=zone.face_v, origin="zone", frames=0)
+    on_wave_v: list[float] = []
+    for obs in chains.values():
+        evs = classify(obs, zone, cfg)
+        states, _ = track_rides(evs, cfg)
+        on_wave_v += [
+            ev.v for ev, st in zip(evs, states, strict=True) if st == "on_wave" and ev.candidate
+        ]
+    return estimate_face(on_wave_v, cfg)
+
+
+def detect_rides(
+    store: SessionStore, zone: Zone, cfg: RidesConfig
+) -> tuple[Rides, FaceBand, Activity]:
+    """Rides for a session with the given zone, without writing anything (also used to score
+    zone proposals against labels)."""
+    info = store.read_model("probe.json", SourceInfo)
+    by_track: dict[int, list[Obs]] = defaultdict(list)
+    for o in session_observations(store):
+        by_track[o.track_id].append(o)
+    chains, members = stitch(list(by_track.values()), cfg)
+    face = _face(chains, zone, cfg)
+    evidence: dict[int, list[Evidence]] = {
+        cid: classify(obs, zone, cfg, face=face.face_v) for cid, obs in chains.items()
+    }
+    act = activity(evidence, info.duration_s, read_meta(store.path("tracks.parquet")).fps)
+    trs: list[TrackRide] = [r for evs in evidence.values() for r in track_rides(evs, cfg)[1]]
+    rides, short = assemble(trs, evidence, cfg=cfg, fps=info.avg_fps, duration_s=info.duration_s)
+    rides = [  # report the tracker's own fragment ids, not chain ids
+        r.model_copy(update={"track_ids": [t for c in r.track_ids for t in members[c]]})
+        for r in rides
+    ]
+    detected = Rides(
+        session_id=store.session.session_id,
+        source=SourceSummary(path=info.path, fps=info.avg_fps, hdr_format=info.hdr_format),
+        settings=RideSettings(
+            min_length_s=cfg.min_length_s,
+            pad_before_s=cfg.pad_before_s,
+            pad_after_s=cfg.pad_after_s,
+        ),
+        rides=rides,
+        short_attempts=short,
+    )
+    return detected, face, act
 
 
 def source_scale(info: SourceInfo, meta: FrameMeta) -> tuple[float, float]:

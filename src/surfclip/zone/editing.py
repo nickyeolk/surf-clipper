@@ -1,10 +1,12 @@
-"""Zone confirmation support for the zone editor (US2): stills, rider-feet hints, save + re-run.
+"""Zone support for the zone editor (US2): stills, rider-feet hints, the proposed zone, save +
+re-run.
 
 Library code called by the API, so the backend stays a thin layer (constitution X).
 """
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -18,6 +20,7 @@ from surfclip.store.frames import read_meta, read_observations
 from surfclip.store.schemas import EditTarget, Point, Rides, SourceInfo, Zone
 from surfclip.store.session import SessionStore
 from surfclip.zone.geometry import PoolMapping
+from surfclip.zone.propose import ZoneProposal, propose_zone
 
 _TONEMAP = (
     "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
@@ -86,17 +89,44 @@ def rider_feet(store: SessionStore, limit: int = 4000) -> list[Point]:
     return [(round(o.feet[0], 1), round(o.feet[1], 1)) for o in obs]
 
 
+PROPOSAL_FILE = "zone_proposal.json"
+
+
+def zone_proposal(store: SessionStore) -> ZoneProposal | None:
+    """The zone proposed from riders' movement (cached until tracks.parquet changes)."""
+    from surfclip.stages import session_observations  # stages import heavy media modules
+
+    tf = store.path("tracks.parquet")
+    if not tf.exists():
+        return None
+    key = f"{tf.stat().st_mtime_ns}:{tf.stat().st_size}"
+    cached = store.path(PROPOSAL_FILE)
+    if cached.exists():
+        data = json.loads(cached.read_text(encoding="utf-8"))
+        if data.get("tracks") == key:
+            return ZoneProposal.model_validate(data["proposal"])
+    w, h = display_size(store.read_model("probe.json", SourceInfo))
+    proposal = propose_zone(session_observations(store), w, h)
+    cached.write_text(
+        json.dumps({"tracks": key, "proposal": proposal.model_dump(mode="json")}, indent=2),
+        encoding="utf-8",
+    )
+    return proposal
+
+
 def confirm_zone(store: SessionStore, zone: Zone, config_path: Path = DEFAULT_CONFIG_PATH) -> Rides:
     """Validate and confirm a zone, then re-run the (cached) pipeline up to rides."""
     from surfclip.stages import default_pipeline  # stages import heavy media modules
 
     PoolMapping.from_corners(zone.corners)  # raises GeometryError for crossed/collinear corners
+    proposal = zone_proposal(store)
+    accepted = proposal is not None and proposal.zone.corners == zone.corners
     zone = zone.model_copy(update={"origin": "user"})
     append_edit(
         store,
         "confirm_zone",
         EditTarget(epoch_id=zone.epoch_id),
-        {"zone": zone.model_dump(mode="json"), "how": "editor"},
+        {"zone": zone.model_dump(mode="json"), "how": "accepted" if accepted else "edited"},
     )
     cfg = load_config(config_path, store.session.config_overrides)
     default_pipeline().run(store, cfg, until="rides")

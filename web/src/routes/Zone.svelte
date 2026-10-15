@@ -1,6 +1,7 @@
 <script lang="ts">
-  // Zone editor (US2, manual part): drag the four corners by role on a full-resolution still,
-  // with riders' feet shown as hints; corners may sit outside the frame. Save re-runs rides.
+  // Zone editor (US2): starts from the zone proposed from riders' movement (or the saved zone);
+  // drag the four corners by role on a full-resolution still, with riders' feet shown as hints;
+  // corners may sit outside the frame. Save re-runs rides.
   import { api, type FaceBand, type Zone, type ZoneInfo } from '../lib/api'
   import { apply, isSimple, poolToImage, type Corners, type Pt } from '../lib/geometry'
 
@@ -26,11 +27,18 @@
       const { width: w, height: h } = z.frame
       corners = z.zone
         ? structuredClone(z.zone.corners)
-        : { back_a: [w * 0.3, h * 0.35], back_b: [w * 0.7, h * 0.35], front_a: [w * 0.1, h * 0.9], front_b: [w * 0.9, h * 0.9] }
+        : z.proposal
+          ? structuredClone(z.proposal.zone.corners)
+          : { back_a: [w * 0.3, h * 0.35], back_b: [w * 0.7, h * 0.35], front_a: [w * 0.1, h * 0.9], front_b: [w * 0.9, h * 0.9] }
       if (z.zone) entry = { side_a: z.zone.entry_walls.includes('side_a'), side_b: z.zone.entry_walls.includes('side_b') }
     }).catch((e) => (error = e.message))
   })
 
+  function useProposal() {
+    if (!info?.proposal) return
+    corners = structuredClone(info.proposal.zone.corners)
+    face = null
+  }
   const w = $derived(info?.frame.width ?? 1)
   const h = $derived(info?.frame.height ?? 1)
   const pad = $derived(Math.max(w, h) * 0.6)
@@ -174,6 +182,21 @@
         Red dots: where people stood on boards in this session; riding should fall inside the
         grid. Green: the wave face estimated from the saved zone.
       </p>
+      {#if info.proposal}
+        {@const pr = info.proposal}
+        <div class="proposal small" class:bad={pr.unreliable}>
+          {#if pr.unreliable}
+            <strong>No reliable proposal</strong> — drag the corners onto the pool yourself.
+          {:else}
+            <strong>Proposed from how riders moved</strong> (confidence {Math.round(pr.confidence * 100)}%,
+            {pr.points} positions). Check that the side walls sit on the walls, then save.
+          {/if}
+          {#each pr.notes as note}<br />· {note}{/each}
+          {#if info.zone}
+            <br /><button onclick={useProposal}>use proposal</button>
+          {/if}
+        </div>
+      {/if}
       {#if !valid}<p class="error small">The edges cross: check which corner is which.</p>{/if}
       <div class="row">
         <label><input type="checkbox" bind:checked={entry.side_a} /> riders enter over side a</label>
@@ -220,6 +243,15 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 12px;
+  }
+  .proposal {
+    border-left: 3px solid var(--ok);
+    padding: 4px 8px;
+    margin: 8px 0;
+    background: var(--bg);
+  }
+  .proposal.bad {
+    border-color: var(--q);
   }
   .secondary {
     background: var(--panel);

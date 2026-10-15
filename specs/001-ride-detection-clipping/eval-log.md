@@ -123,3 +123,25 @@ labelled by the user, scored with no tuning.
 * Start error p95 3.5 s, end error p95 0.5 s.
 
 User verdict: segments are good enough for now; move on to zone proposal (US2).
+## 2026-10-15 - zone proposal (US2, T034/T036)
+
+`zone/propose.py` proposes the zone from tracked riders only: perspective from rider heights
+(apparent height is linear in image position on a plane -> horizon), the riding direction's
+vanishing point searched on the horizon, side walls towards the vanishing point at right angles
+(assumed 26 mm-equivalent lens), walls at the 1st/99th percentile of riders' position along the
+wave, wave face (5th-95th percentile depth) placed at pool depth 0.6-0.9. `scripts/
+zone_proposal_eval.py` compares with the hand-drawn zones and scores rides with the proposal:
+
+| Session | median abs du vs hand | Recall | Precision | Complete | Tightness (hand zone) |
+| --- | --- | --- | --- | --- | --- |
+| 20240924 | 0.040 | 100% | 100% | 93.7% (96.2%) | 3.50 s (2.00 s) |
+| 20241004 | 0.276 | 98.7% | 98.7% | 98.7% (96.0%) | 3.90 s (2.00 s) |
+| 20260928_IMG_1652 | 0.112 | 94.3% | 90.9% | 79.2% (79.2%) | 2.80 s (2.40 s) |
+| 20261012_110549566 | 0.026 | 100% | 100% | 89.7% (90.8%) | 2.55 s (3.04 s) |
+| PXL_20261014_100546073 | 0.117 | 85.4% | 92.7% | 69.7% (86.5%) | 2.60 s (2.00 s) |
+
+Good enough as a starting point the user checks in the zone editor, not as a replacement:
+clips run longer (tightness) and PXL completeness drops. Depth is the weaker estimate (horizon
+from heights is ~40 px off even on synthetic data). The stance label is not used: the box-shape
+rule does not separate crouching from standing (`scripts/stance_report.py`: 20-43% of riding
+frames "crouched", median aspect 1.41-1.73 against a 1.4 threshold). Next: pose model.

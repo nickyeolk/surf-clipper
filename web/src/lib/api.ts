@@ -70,11 +70,21 @@ export interface FaceBand {
   frames: number
 }
 
+export interface ZoneProposal {
+  zone: Zone
+  confidence: number
+  unreliable: boolean
+  points: number
+  walls_in_frame: Record<string, boolean>
+  notes: string[]
+}
+
 export interface ZoneInfo {
   zone: Zone | null
   face: FaceBand | null
   frame: { width: number; height: number; duration_s: number }
   feet: [number, number][]
+  proposal: ZoneProposal | null
 }
 
 export interface RideFlags {
