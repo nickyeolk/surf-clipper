@@ -2,7 +2,7 @@
   // Label mode: validate the tool's proposed rides against the video, add missed ones.
   // Label work is ground truth: it never changes detected rides or edits.json.
   import { api, clock, type Activity, type LabelItem, type LabelWork, type SourceInfo } from '../lib/api'
-  import Timeline from '../lib/Timeline.svelte'
+  import Timeline, { type Bar } from '../lib/Timeline.svelte'
 
   let { sessionId }: { sessionId: string } = $props()
 
@@ -50,6 +50,15 @@
             b.start_s - 0.5 <= a.start_s && a.end_s <= b.end_s + 0.5) ids.add(a.id)
     return ids
   })
+  const COLOURS: Record<string, string> = {
+    '?': '#f0b429', ok: '#3fb950', fix: '#58a6ff', no: '#6e7681', add: '#bc8cff',
+  }
+  const bars = $derived<Bar[]>(
+    items.map((it) => ({
+      id: it.id, start_s: it.start_s, end_s: it.end_s, colour: COLOURS[it.verdict],
+      dim: it.detected_as === 'short' && it.verdict === '?',
+    })),
+  )
   const zoomFrom = $derived(Math.max(0, Math.min(current - ZOOM_S / 2, duration - ZOOM_S)))
 
   // ---- saving -------------------------------------------------------------------------------
@@ -250,9 +259,9 @@
           {/each}
         </span>
       </div>
-      <Timeline from={0} to={duration} {items} {activity} {current} scannedTo={work.scanned_to_s}
+      <Timeline from={0} to={duration} {bars} {activity} {current} scannedTo={work.scanned_to_s}
         {selectedId} {pendingStart} onseek={seek} onselect={(id) => select(id)} />
-      <Timeline from={zoomFrom} to={zoomFrom + ZOOM_S} {items} {activity} {current}
+      <Timeline from={zoomFrom} to={zoomFrom + ZOOM_S} {bars} {activity} {current}
         scannedTo={work.scanned_to_s} {selectedId} {pendingStart} onseek={seek}
         onselect={(id) => select(id)} />
       <p class="muted small">

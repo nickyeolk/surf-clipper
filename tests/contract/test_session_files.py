@@ -40,7 +40,7 @@ def test_rides_example_validates_and_round_trips() -> None:
 
 def test_edits_example_validates() -> None:
     edits = Edits.model_validate(_json_blocks()["edits.json"])
-    assert [e.op for e in edits.edits] == ["confirm_zone", "trim"]
+    assert [e.op for e in edits.edits] == ["confirm_zone", "trim", "undo"]
 
 
 def test_short_detected_ride_is_rejected_but_user_added_is_kept() -> None:

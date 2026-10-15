@@ -1,26 +1,36 @@
+<script lang="ts" module>
+  export interface Bar {
+    id: string
+    start_s: number
+    end_s: number
+    colour: string
+    dim?: boolean
+  }
+</script>
+
 <script lang="ts">
-  // One timeline lane: activity strip, ride bars coloured by verdict, scanned span, playhead.
+  // One timeline lane: activity strip, ride bars, scanned span, playhead.
   // Click to seek; click a bar to select that ride.
-  import type { Activity, LabelItem } from './api'
+  import type { Activity } from './api'
 
   interface Props {
     from: number
     to: number
-    items: LabelItem[]
+    bars: Bar[]
     activity: Activity | null
     current: number
-    scannedTo: number
+    scannedTo?: number
     selectedId: string | null
     pendingStart: number | null
+    pendingColour?: string
     onseek: (t: number) => void
     onselect: (id: string) => void
   }
-  let { from, to, items, activity, current, scannedTo, selectedId, pendingStart, onseek, onselect }:
-    Props = $props()
+  let {
+    from, to, bars, activity, current, scannedTo = 0, selectedId, pendingStart,
+    pendingColour = '#bc8cff', onseek, onselect,
+  }: Props = $props()
 
-  const COLOURS: Record<string, string> = {
-    '?': '#f0b429', ok: '#3fb950', fix: '#58a6ff', no: '#6e7681', add: '#bc8cff',
-  }
   let canvas: HTMLCanvasElement
   let width = $state(800)
   const height = 64
@@ -55,22 +65,22 @@
       }
     }
     // ride bars
-    for (const it of items) {
-      if (it.end_s < from || it.start_s > to) continue
-      const x0 = x(it.start_s)
-      const w = Math.max(2, x(it.end_s) - x0)
-      ctx.fillStyle = COLOURS[it.verdict]
-      ctx.globalAlpha = it.detected_as === 'short' && it.verdict === '?' ? 0.55 : 0.9
+    for (const b of bars) {
+      if (b.end_s < from || b.start_s > to) continue
+      const x0 = x(b.start_s)
+      const w = Math.max(2, x(b.end_s) - x0)
+      ctx.fillStyle = b.colour
+      ctx.globalAlpha = b.dim ? 0.5 : 0.9
       ctx.fillRect(x0, 20, w, 30)
       ctx.globalAlpha = 1
-      if (it.id === selectedId) {
+      if (b.id === selectedId) {
         ctx.strokeStyle = '#ffffff'
         ctx.lineWidth = 2
         ctx.strokeRect(x0 - 1, 19, w + 2, 32)
       }
     }
     if (pendingStart !== null && pendingStart >= from && pendingStart <= to) {
-      ctx.fillStyle = COLOURS.add
+      ctx.fillStyle = pendingColour
       ctx.fillRect(x(pendingStart), 16, Math.max(2, x(current) - x(pendingStart)), 38)
     }
     // playhead
@@ -83,9 +93,11 @@
     const t = from + ((e.clientX - rect.left) / rect.width) * (to - from)
     const y = e.clientY - rect.top
     if (y >= 20 && y <= 50) {
-      const hit = items.find((it) => it.start_s <= t && it.end_s >= t)
-      if (hit) {
-        onselect(hit.id)
+      // prefer the shortest bar under the pointer (short attempts sit inside nothing, rides on top)
+      const hits = bars.filter((b) => b.start_s <= t && b.end_s >= t)
+      hits.sort((a, b) => a.end_s - a.start_s - (b.end_s - b.start_s))
+      if (hits[0]) {
+        onselect(hits[0].id)
         return
       }
     }

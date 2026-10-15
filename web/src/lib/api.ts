@@ -12,6 +12,7 @@ export interface SessionSummary {
   labels_done: number
   labels_total: number
   labels_final: boolean
+  exported: number
 }
 
 export type Verdict = '?' | 'ok' | 'fix' | 'no' | 'add'
@@ -76,6 +77,66 @@ export interface ZoneInfo {
   feet: [number, number][]
 }
 
+export interface RideFlags {
+  lesson: boolean
+  truncated: boolean
+  user_edited: boolean
+  user_added: boolean
+}
+
+export interface ExportRecord {
+  path: string
+  exported_at: string
+  span: [number, number]
+}
+
+export interface Ride {
+  ride_id: string
+  start_s: number
+  end_s: number
+  confidence: number
+  clip_start_s: number
+  clip_end_s: number
+  start_kind: string
+  flags: RideFlags
+  export: ExportRecord | null
+}
+
+export interface ShortAttempt {
+  ride_id: string
+  start_s: number
+  end_s: number
+  confidence: number
+}
+
+export interface Rides {
+  session_id: string
+  source: { path: string; fps: number; hdr_format: string }
+  settings: { min_length_s: number; pad_before_s: number; pad_after_s: number }
+  rides: Ride[]
+  short_attempts: ShortAttempt[]
+}
+
+export type EditOp = 'trim' | 'split' | 'merge' | 'delete' | 'add' | 'undo'
+
+export interface UserEdit {
+  edit_id: number
+  at: string
+  op: EditOp | 'confirm_zone'
+  target: { epoch_id?: number | null; ride_id?: string | null; ride_ids?: string[] | null }
+  payload: Record<string, unknown>
+}
+
+export interface Job {
+  job_id: string
+  kind: string
+  status: 'queued' | 'running' | 'done' | 'failed'
+  progress: number
+  message: string
+  result: { exported?: string[]; up_to_date?: string[]; folder?: string }
+  error: string | null
+}
+
 export class ApiError extends Error {
   constructor(public code: string, message: string) {
     super(message)
@@ -112,6 +173,23 @@ export const api = {
       body: JSON.stringify(zone),
     }),
   keyframeUrl: (id: string, t: number) => `/api/sessions/${id}/keyframe.jpg?t=${Math.round(t)}`,
+  rides: (id: string) => call<Rides>(`/sessions/${id}/rides`),
+  edits: (id: string) => call<{ edits: UserEdit[] }>(`/sessions/${id}/edits`),
+  edit: (
+    id: string,
+    op: EditOp,
+    target: { ride_id?: string; ride_ids?: string[] },
+    payload: Record<string, number> = {},
+  ) =>
+    call<{ edit: UserEdit; rides: Rides }>(`/sessions/${id}/edits`, {
+      method: 'POST',
+      body: JSON.stringify({ op, target, payload }),
+    }),
+  exportClips: (id: string, rides?: string[]) =>
+    call<Job>(`/sessions/${id}/export`, { method: 'POST', body: JSON.stringify({ rides: rides ?? null }) }),
+  job: (jobId: string) => call<Job>(`/jobs/${jobId}`),
+  thumbUrl: (id: string, t: number) => `/api/sessions/${id}/media/thumb.jpg?t=${(Math.round(t * 2) / 2).toFixed(1)}`,
+  clipUrl: (id: string, rideId: string) => `/api/sessions/${id}/media/clips/${rideId}.mp4`,
 }
 
 export function clock(seconds: number): string {

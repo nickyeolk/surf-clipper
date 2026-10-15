@@ -256,7 +256,7 @@ def serve(
     url = f"http://localhost:{cfg.server.port}"
     typer.echo(f"Surf Session Clipper at {url}  (Ctrl+C to stop)", err=True)
     uvicorn.run(
-        create_app(artifacts.resolve(), labels_dir.resolve(), web_dist),
+        create_app(artifacts.resolve(), labels_dir.resolve(), web_dist, config.resolve()),
         host=cfg.server.host,
         port=cfg.server.port,
         log_level="warning",

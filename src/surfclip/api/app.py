@@ -9,17 +9,23 @@ from __future__ import annotations
 
 import json
 import subprocess
+import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from surfclip.edits.log import confirmed_zone, read_edits
+from surfclip.api.jobs import Job, Jobs, Report
+from surfclip.config import DEFAULT_CONFIG_PATH, load_config
+from surfclip.edits.log import append_edit, confirmed_zone, read_edits
+from surfclip.edits.rebuild import rebuild_rides
 from surfclip.eval.labels import LabelError, LabelWork, finalize, work_from_rides
-from surfclip.store.schemas import Rides, Session, SourceInfo, Zone
+from surfclip.media.export import export_rides, read_exports
+from surfclip.media.review import thumbnail
+from surfclip.store.schemas import EditTarget, Rides, Session, SourceInfo, UserEdit, Zone
 from surfclip.store.session import SessionStore
 from surfclip.zone.editing import confirm_zone, display_size, keyframe, rider_feet
 from surfclip.zone.geometry import GeometryError
@@ -43,10 +49,27 @@ class SessionSummary(BaseModel):
     labels_done: int
     labels_total: int
     labels_final: bool
+    exported: int
+
+
+RideOp = Literal["trim", "split", "merge", "delete", "add", "undo"]
+
+
+class EditRequest(BaseModel):
+    op: RideOp
+    target: EditTarget = EditTarget()
+    payload: dict[str, float | int] = {}
+
+
+class ExportRequest(BaseModel):
+    rides: list[str] | None = None  # default: every ride (only new or changed ones re-encode)
 
 
 def create_app(
-    artifacts: Path, labels_dir: Path = Path("labels/rides"), web_dist: Path | None = None
+    artifacts: Path,
+    labels_dir: Path = Path("labels/rides"),
+    web_dist: Path | None = None,
+    config_path: Path = DEFAULT_CONFIG_PATH,
 ) -> FastAPI:
     app = FastAPI(
         title="Surf Session Clipper", docs_url="/api/docs", openapi_url="/api/openapi.json"
@@ -131,6 +154,7 @@ def create_app(
                     labels_done=total - work.remaining if work else 0,
                     labels_total=total,
                     labels_final=final_file.exists(),
+                    exported=sum(1 for r in rides.rides if r.export) if rides else 0,
                 )
             )
         return out
@@ -224,6 +248,113 @@ def create_app(
         if not path.exists():
             raise ApiError(404, "not_ready", "no review copy yet: run `surfclip run` once more")
         return FileResponse(path, media_type="video/mp4")
+
+    # ---- review: edits and export -------------------------------------------------------------
+    jobs = Jobs()
+    write_lock = threading.Lock()  # rides.json writers: edits and the end of an export
+
+    def check_edit(req: EditRequest, rides: Rides, edits: list[UserEdit]) -> list[str]:
+        """Validate a ride edit against the current rides; returns the target ride ids."""
+        by_id = {r.ride_id: r for r in rides.rides}
+        ids = req.target.ride_ids or ([req.target.ride_id] if req.target.ride_id else [])
+        p = req.payload
+
+        def bad(message: str) -> ApiError:
+            return ApiError(400, "invalid_edit", message)
+
+        if req.op == "undo":
+            target = p.get("edit_id")
+            if not isinstance(target, int) or not 1 <= target <= len(edits):
+                raise bad("undo needs the edit_id of an earlier edit")
+            if edits[target - 1].op == "confirm_zone":
+                raise bad("zone confirmations are changed in the zone editor, not undone")
+            return []
+        if req.op == "add":
+            if not ("start_s" in p and "end_s" in p and p["end_s"] - p["start_s"] >= 0.5):
+                raise bad("add needs start_s < end_s (at least 0.5 s)")
+            return []
+        if req.op == "merge" and len(ids) < 2:
+            raise bad("merge needs at least two ride_ids")
+        if req.op != "merge" and len(ids) != 1:
+            raise bad(f"{req.op} needs exactly one ride_id")
+        missing = [i for i in ids if i not in by_id]
+        if missing:
+            raise ApiError(404, "ride_not_found", f"no ride {', '.join(missing)}")
+        r = by_id[ids[0]]
+        if req.op == "trim":
+            start, end = p.get("start_s", r.start_s), p.get("end_s", r.end_s)
+            if end - start < 0.5:
+                raise bad("a trimmed ride must keep at least 0.5 s")
+        if req.op == "split" and not ("at_s" in p and r.start_s < p["at_s"] < r.end_s):
+            raise bad("split needs at_s inside the ride")
+        return ids
+
+    @app.get("/api/sessions/{sid}/edits")
+    def get_edits(sid: str) -> dict[str, Any]:
+        edits = read_edits(store_of(sid))
+        return edits.model_dump(mode="json")
+
+    @app.post("/api/sessions/{sid}/edits")
+    def post_edit(sid: str, req: EditRequest) -> dict[str, Any]:
+        store = store_of(sid)
+        if not store.path("rides.detected.json").exists():
+            raise ApiError(404, "not_ready", "no detected rides yet: run the pipeline")
+        with write_lock:
+            rides: Rides = read(folder(sid) / "rides.json", Rides)
+            ids = check_edit(req, rides, read_edits(store).edits)
+            payload: dict[str, object] = dict(req.payload)
+            if ids:  # where each target ride was, to re-attach the edit after a re-run
+                by_id = {r.ride_id: r for r in rides.rides}
+                payload["spans"] = {i: [by_id[i].start_s, by_id[i].end_s] for i in ids}
+            edit = append_edit(store, req.op, req.target, payload)
+            rides = rebuild_rides(store)
+        return {"edit": edit.model_dump(mode="json"), "rides": rides.model_dump(mode="json")}
+
+    @app.post("/api/sessions/{sid}/export")
+    def post_export(sid: str, req: ExportRequest) -> Job:
+        store = store_of(sid)
+        read(folder(sid) / "rides.json", Rides)
+        running = jobs.active(sid, "export")
+        if running is not None:
+            return running
+        cfg = load_config(config_path, store.session.config_overrides)
+
+        def work(report: Report) -> dict[str, object]:
+            def progress(i: int, n: int, rid: str) -> None:
+                report((i - 1) / max(n, 1), f"encoding {rid} ({i}/{n})")
+
+            done, skipped = export_rides(store, cfg.export, ride_ids=req.rides, progress=progress)
+            with write_lock:
+                rebuild_rides(store)
+            return {"exported": done, "up_to_date": skipped, "folder": str(store.path("clips"))}
+
+        return jobs.submit("export", sid, work)
+
+    @app.get("/api/jobs/{job_id}")
+    def get_job(job_id: str) -> Job:
+        job = jobs.get(job_id)
+        if job is None:
+            raise ApiError(404, "job_not_found", f"no job {job_id}")
+        return job
+
+    @app.get("/api/sessions/{sid}/media/clips/{ride_id}.mp4")
+    def clip_video(sid: str, ride_id: str) -> FileResponse:
+        store = store_of(sid)
+        rec = read_exports(store).records.get(ride_id)
+        if rec is None or not store.path(rec.path).exists():
+            raise ApiError(404, "not_exported", f"ride {ride_id} has no exported clip yet")
+        return FileResponse(store.path(rec.path), media_type="video/mp4")
+
+    @app.get("/api/sessions/{sid}/media/thumb.jpg")
+    def ride_thumb(sid: str, t: float) -> FileResponse:
+        root = folder(sid)
+        if not (root / "review.mp4").exists():
+            raise ApiError(404, "not_ready", "no review copy yet")
+        try:
+            path = thumbnail(root / "review.mp4", t, root / "thumbs")
+        except subprocess.CalledProcessError as exc:
+            raise ApiError(500, "thumb_failed", "could not extract a still") from exc
+        return FileResponse(path, media_type="image/jpeg")
 
     if web_dist is not None and (web_dist / "index.html").exists():
         app.mount("/", StaticFiles(directory=web_dist, html=True), name="web")

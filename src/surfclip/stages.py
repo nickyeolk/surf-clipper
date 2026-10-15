@@ -20,10 +20,9 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 from surfclip.config import RidesConfig
-from surfclip.edits.apply import apply_edits
 from surfclip.edits.log import confirmed_zone, read_edits
+from surfclip.edits.rebuild import rebuild_rides
 from surfclip.media.decode import Frame, iter_proxy_frames, output_size
-from surfclip.media.export import attach_exports, read_exports
 from surfclip.media.probe import probe
 from surfclip.media.review import make_review_copy
 from surfclip.pipeline import Pipeline, Stage, StageContext
@@ -177,7 +176,12 @@ class RidesStage(Stage):
     config_sections: tuple[str, ...] = ("rides",)
     code_version: str = field(
         default_factory=lambda: source_version(
-            "rides/*.py", "edits/apply.py", "zone/geometry.py", "media/export.py", "stages.py"
+            "rides/*.py",
+            "edits/apply.py",
+            "edits/rebuild.py",
+            "zone/geometry.py",
+            "media/export.py",
+            "stages.py",
         )
     )
 
@@ -227,8 +231,7 @@ class RidesStage(Stage):
             short_attempts=short,
         )
         store.write_model("rides.detected.json", detected)
-        edited = apply_edits(detected, read_edits(store))
-        store.write_model("rides.json", attach_exports(edited, read_exports(store), store))
+        rebuild_rides(store, detected)
         return ["rides.detected.json", "rides.json", "activity.json", "face.json"]
 
     @staticmethod

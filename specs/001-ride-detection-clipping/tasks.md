@@ -153,18 +153,18 @@ edits remain and detection is not re-run (cache hits); seeks ≤ 1 s, frame step
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T051 [P] [US4] Unit tests for edits in tests/unit/test_edits.py: each op applied deterministically; after re-detection with shifted boundaries, edits re-attach by IoU ≥ 0.5, unmatched edited rides kept as `user_added`; edits.json byte-identical after any pipeline re-run (SC-007)
-- [ ] T052 [P] [US4] API contract tests for rides, edits, export and media routes (Range requests return 206 with correct Content-Range) in tests/contract/test_api_review.py
+- [x] T051 [P] [US4] Unit tests for edits in tests/unit/test_edits.py: each op applied deterministically; after re-detection with shifted boundaries, edits re-attach by IoU ≥ 0.5, unmatched edited rides kept as `user_added`; edits.json byte-identical after any pipeline re-run (SC-007)
+- [x] T052 [P] [US4] API contract tests for rides, edits, export and media routes (Range requests return 206 with correct Content-Range) in tests/contract/test_api_review.py
 - [ ] T053 [P] [US4] Integration test: re-run from `rides` with `rides.min_length_s = 15` keeps all edits and reports cache hits for detect/track, in tests/integration/test_rerun_keeps_edits.py
 
 ### Implementation for User Story 4
 
 - [ ] T054 [P] [US4] Implement review assets in src/surfclip/media/review.py: review.mp4 (720p H.264 SDR, keyframe every 0.5 s, NVENC with CPU fallback), thumbnail sprite sheets (1 per 10 s) + thumbs/index.json, per-ride review_segments/<ride_id>.mp4 (padded)
 - [ ] T055 [P] [US4] Implement exact-frame endpoint helper (seek + decode one frame → PNG, tone-mapped for HDR) in src/surfclip/media/frame.py
-- [ ] T056 [US4] Implement edit re-attachment on re-run in src/surfclip/edits/apply.py; until T051 passes
-- [ ] T057 [US4] Implement rides, edits, export, rerun and media routes (HTTP Range) per contracts/http-api.md in src/surfclip/api/routes_rides.py and src/surfclip/api/routes_media.py; until T052 passes
+- [x] T056 [US4] Implement edit re-attachment on re-run in src/surfclip/edits/apply.py; until T051 passes
+- [ ] T057 [US4] Implement rides, edits, export, rerun and media routes (HTTP Range) per contracts/http-api.md in src/surfclip/api/routes_rides.py and src/surfclip/api/routes_media.py; until T052 passes. *(2026-10-15: rides, edits (+ `undo`), export jobs, clip and thumbnail routes done in src/surfclip/api/app.py and api/jobs.py; rerun route still open)*
 - [ ] T058 [US4] Build the player in web/src/lib/player/: buffered ride segment playback, frame step ←/→ using `requestVideoFrameCallback` with exact-frame endpoint fallback, slow motion (0.25×/0.5×), thumbnail-strip timeline with remap markers
-- [ ] T059 [US4] Build the Review screen in web/src/routes/Review.svelte: ride list with thumbnails sorted lowest confidence first, lesson/truncated flags, short-attempt list, trim (set in/out at current frame), split at current frame, merge with neighbour, delete, add missed ride, re-run with settings, Export button (only new/changed rides)
+- [ ] T059 [US4] Build the Review screen in web/src/routes/Review.svelte: ride list with thumbnails sorted lowest confidence first, lesson/truncated flags, short-attempt list, trim (set in/out at current frame), split at current frame, merge with neighbour, delete, add missed ride, re-run with settings, Export button (only new/changed rides). *(2026-10-15: done except re-run with settings; frame step and 0.25×/0.5× use the review copy; per-ride thumbnails instead of sprite sheets)*
 - [ ] T060 [US4] Measure SC-009 (seek and frame-step latency) and SC-008 (hands-on time) on a 1 h session and record in specs/001-ride-detection-clipping/eval-log.md
 
 **Checkpoint**: All four stories work; full session workflow in the browser

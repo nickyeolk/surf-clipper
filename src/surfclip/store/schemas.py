@@ -239,7 +239,7 @@ class EditTarget(_Model):
     ride_ids: list[str] | None = None
 
 
-EditOp = Literal["confirm_zone", "trim", "split", "merge", "delete", "add"]
+EditOp = Literal["confirm_zone", "trim", "split", "merge", "delete", "add", "undo"]
 
 
 class UserEdit(_Model):

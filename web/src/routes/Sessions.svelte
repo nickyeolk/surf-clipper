@@ -25,6 +25,7 @@
         <th>Length</th>
         <th>Rides</th>
         <th>Short</th>
+        <th>Exported</th>
         <th>Labels</th>
         <th></th>
       </tr>
@@ -36,6 +37,7 @@
           <td>{s.duration_s ? clock(s.duration_s).replace(/\.\d+$/, '') : '–'}</td>
           <td>{s.rides ?? '–'}</td>
           <td>{s.short_attempts ?? '–'}</td>
+          <td>{s.rides !== null ? s.exported : '–'}</td>
           <td>
             {#if s.labels_final}
               <span class="tag ok">done</span>
@@ -49,7 +51,8 @@
           <td>
             <a class="button secondary" href={`#/zone/${s.session_id}`}>Zone</a>
             {#if s.has_review_copy && s.rides !== null}
-              <a class="button" href={`#/label/${s.session_id}`}>Label</a>
+              <a class="button" href={`#/review/${s.session_id}`}>Review</a>
+            <a class="button secondary" href={`#/label/${s.session_id}`}>Label</a>
             {:else}
               <span class="muted" title="Run `surfclip run` to make the review copy">not ready</span>
             {/if}

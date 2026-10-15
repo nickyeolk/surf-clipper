@@ -90,3 +90,40 @@ def make_review_copy(info: SourceInfo, out: Path, cfg: ReviewConfig, *, cpu: boo
         tmp.unlink(missing_ok=True)
         raise RuntimeError(f"review copy failed: {result.stderr.strip()[-500:]}")
     tmp.replace(out)
+
+
+THUMB_WIDTH = 320
+
+
+def thumbnail(review: Path, t: float, cache_dir: Path) -> Path:
+    """A small JPEG still from the review copy at time t (cached per half second)."""
+    t = max(0.0, round(t * 2) / 2)
+    out = cache_dir / f"t{t:09.1f}.jpg"
+    if out.exists():
+        return out
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_name(out.stem + ".tmp.jpg")
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-nostdin",
+            "-y",
+            "-ss",
+            f"{t:.3f}",
+            "-i",
+            str(review),
+            "-frames:v",
+            "1",
+            "-vf",
+            f"scale={THUMB_WIDTH}:-2",
+            "-q:v",
+            "5",
+            str(tmp),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    tmp.replace(out)
+    return out

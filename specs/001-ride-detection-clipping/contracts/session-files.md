@@ -63,10 +63,17 @@ artifacts/<session_id>/
      "payload": {"corners": {"back_a": [102, 233], "back_b": [1180, 241],
                  "front_a": [40, 690], "front_b": [1265, 702]}, "how": "accepted"}},
     {"edit_id": 2, "at": "2026-10-13T11:05:10Z", "op": "trim", "target": {"ride_id": "r004512"},
-     "payload": {"start_s": 150.1}}
+     "payload": {"start_s": 150.1, "spans": {"r004512": [150.4, 171.9]}}},
+    {"edit_id": 3, "at": "2026-10-13T11:06:00Z", "op": "undo", "target": {},
+     "payload": {"edit_id": 2}}
   ]
 }
 ```
+
+Ops: `confirm_zone`, `trim` (`start_s`/`end_s`), `split` (`at_s`), `merge` (`target.ride_ids`),
+`delete`, `add` (`start_s`, `end_s`; ride id `u<edit_id>`), `undo` (`edit_id`; an undo can be
+undone). Ride edits carry `spans`: each target ride's span when the edit was made, used to
+re-attach the edit by IoU >= 0.5 when a re-run gives the ride another id.
 
 Invariants: `edits.json` is append-only; `rides.json` is always reproducible from
 `rides.detected.json` + `edits.json`; source files are never written.

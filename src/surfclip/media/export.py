@@ -227,5 +227,7 @@ def export_rides(
         )
         store.write_model(EXPORTS_FILE, exports)
         done.append(ride.ride_id)
-    store.write_model("rides.json", attach_exports(rides, exports, store))
+    # Re-read: the user may have edited rides while clips were encoding.
+    latest = store.read_model("rides.json", Rides)
+    store.write_model("rides.json", attach_exports(latest, exports, store))
     return done, skipped
