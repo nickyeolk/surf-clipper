@@ -106,3 +106,20 @@ separate them either, so no automatic framing warning yet.
 
 Open: the night HDR session misses completeness (8 cut rides: 27:08 and 53:22 end ~11 s early,
 the rest are 1.5-5 s start or end errors) and is 0.04 s over the tightness target.
+## 2026-10-15 - first held-out session: PXL_20261014_100546073
+
+New footage (Pixel, 1080p HLG, 55.7 min, front-deck view; left wall partly out of frame),
+labelled by the user, scored with no tuning.
+
+| Session | Recall | Precision | Complete | Tightness |
+| --- | --- | --- | --- | --- |
+| PXL_20261014_100546073 (held out) | 86.5% | 95.1% | 86.5% | 2.00 s |
+
+* 8 rides missed outright (the user added them).
+* 4 detected rides each join two consecutive labelled rides 7-10 s apart (00:41, 14:08, 23:07,
+  24:26; two tracks each). Likely the wall-stall bridge (a rider resting at the wall keeps the
+  ride open up to 10 s) followed by the cross-track wall return picking up the next rider. This
+  is the over-fitting risk discussed earlier; fix with more held-out data, not on this session.
+* Start error p95 3.5 s, end error p95 0.5 s.
+
+User verdict: segments are good enough for now; move on to zone proposal (US2).
