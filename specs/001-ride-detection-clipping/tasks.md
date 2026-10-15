@@ -246,3 +246,10 @@ Task: "ByteTrack tracking in src/surfclip/track/tracker.py"                     
   activity strip) once US4 lands
 - Never write to the sample footage folder; fixtures and outputs live under artifacts/
 - Commit after each task or logical group
+
+## Backlog (not in 001)
+
+- [ ] Pose model (YOLO11s-pose) for stance and, later, trick identification. The box-shape stance
+  rule does not separate crouching from standing (scripts/stance_report.py); a pose spike on
+  20240924 (scripts/spikes/pose_stance.py, contact sheet of 36 riders) gave plausible knee angles.
+  Weights: artifacts/models/yolo11s-pose.pt. Needs re-analysis of all sessions (~25 min per hour).
