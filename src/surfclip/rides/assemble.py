@@ -3,6 +3,8 @@
 * Acid drops across tracks: a track that ends on an entry side wall, followed within
   ``acid_link_s`` by an on-wave track starting nearby (in rider heights), is one ride that starts
   at the jump. The tracker often loses a fast, blurred drop-in.
+* Wall returns: a rider who turns at a side wall and is picked up by a new track within
+  ``wall_return_max_s`` continues the same ride.
 * Frame-edge returns: a ride that leaves through a frame edge and comes back through the same edge
   within ``frame_edge_grace_s`` continues as one ride.
 * Lessons: a ride is flagged when other people are in the zone (an instructor in the water, or
@@ -152,6 +154,52 @@ def _merge_continuations(drafts: list[_Draft], cfg: RidesConfig) -> list[_Draft]
     return merged
 
 
+def _wall_of(u: float, cfg: RidesConfig) -> str | None:
+    if u <= cfg.wall_stall_pool:
+        return "a"
+    if u >= 1 - cfg.wall_stall_pool:
+        return "b"
+    return None
+
+
+def _merge_wall_returns(
+    drafts: list[_Draft], evidence: Mapping[int, Sequence[Evidence]], cfg: RidesConfig
+) -> list[_Draft]:
+    """Join a ride that ends at a side wall to one that leaves the same wall within
+    ``wall_return_max_s``, when the second track first appeared in that time and within
+    ``acid_link_heights`` of where the ride ended: the rider turned at the wall and the tracker
+    lost them there (20240924 28:47). A rider already waiting on that wall, one dropping in later
+    (20241004 9:13, 6.4 s), or one leaving through a frame edge is handled elsewhere."""
+    first_seen = {tid: evs[0] for tid, evs in evidence.items() if evs}
+    drafts = sorted(drafts, key=lambda d: d.start_t)
+    merged: list[_Draft] = []
+    for d in drafts:
+        prev = max(merged, key=lambda p: p.end_t, default=None)
+        seen = [first_seen[t] for t in d.track_ids if t in first_seen]
+        if prev is not None and seen:
+            gap = d.start_t - prev.end_t
+            wall = _wall_of(prev.last_ev.u, cfg)
+            new = min(seen, key=lambda ev: ev.t)
+            a, b = prev.last_ev.obs, new.obs
+            height = max(a.box_height, b.box_height, 1.0)
+            dist = math.hypot(b.feet[0] - a.feet[0], b.feet[1] - a.feet[1]) / height
+            if (
+                wall is not None
+                and a.edge == "none"  # leaving through a frame edge: frame_edge_grace_s rules
+                and _wall_of(d.first_ev.u, cfg) == wall
+                and 0 <= gap <= cfg.wall_return_max_s + _EPS
+                and 0 <= new.t - prev.end_t <= cfg.wall_return_max_s + _EPS
+                and dist <= cfg.acid_link_heights
+            ):
+                prev.end_t = d.end_t
+                prev.last_ev = d.last_ev
+                prev.track_ids += [t for t in d.track_ids if t not in prev.track_ids]
+                prev.evidence += d.evidence
+                continue
+        merged.append(d)
+    return merged
+
+
 def _lesson(d: _Draft, evidence: Mapping[int, Sequence[Evidence]], cfg: RidesConfig) -> bool:
     duration = d.end_t - d.start_t
     if duration <= 0:
@@ -203,6 +251,7 @@ def assemble(
     _link_acid_drops(drafts, evidence, cfg)
     drafts = _merge_edge_returns(drafts, cfg)
     drafts = _merge_continuations(drafts, cfg)
+    drafts = _merge_wall_returns(drafts, evidence, cfg)
     for d in drafts:
         d.lesson = _lesson(d, evidence, cfg)
     drafts = _merge_lessons(drafts, cfg)

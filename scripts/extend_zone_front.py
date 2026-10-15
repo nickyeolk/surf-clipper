@@ -14,8 +14,8 @@ from pathlib import Path
 
 import numpy as np
 
-from surfclip.stages import source_scale
 from surfclip.rides.evidence import to_source_pixels
+from surfclip.stages import source_scale
 from surfclip.store.frames import read_meta, read_observations
 from surfclip.store.schemas import SourceInfo, Zone, ZoneCorners
 from surfclip.store.session import SessionStore

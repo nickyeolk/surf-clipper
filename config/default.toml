@@ -61,6 +61,9 @@ wall_stall_pool = 0.1         # within this of a side wall, any posture counts a
                               # while bridging (stalls against the wall, 20240924)
 wall_stall_max_s = 10.0       # holding on at a side wall (crouched/standing/on board) keeps a ride
                               # going this long (20241004: ~5 s holds)
+wall_return_max_s = 4.0       # a ride ending at a side wall continues with a track that appears
+                              # nearby and rides back out within this long (rider turned there;
+                              # 20241004 9:13: a new rider 6.4 s later is a separate ride)
 wall_band_in_pool = 0.0      # a side wall's band reaches this far into the pool (0: riders
                               # carve right up to the wall, 20261012)...
 wall_band_out_pool = 0.25     # ...and this far beyond it (feet on the wall top project outward)
@@ -78,8 +81,9 @@ stitch_base_heights = 1.5     # ...when the next fragment starts within this man
 stitch_heights_per_s = 3.0    # ...plus this much per second of gap (riders move fast)
 frame_edge_grace_s = 2.0
 min_length_s = 10.0           # user-settable before processing
-pad_before_s = 1.0
-pad_after_s = 1.5
+pad_before_s = 1.5            # 1.5/2.0 chosen by scripts/pad_sweep.py (2026-10-15): SC-003 holds
+                              # on 20240924 and 20241004 with p95 overhang 2.0 s
+pad_after_s = 2.0
 refine_window_s = 2.0
 changeover_overlap_max_s = 3.0
 

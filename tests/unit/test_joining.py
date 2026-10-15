@@ -68,6 +68,23 @@ def test_identity_switch_mid_ride_is_one_ride() -> None:
     assert rides[0].track_ids == [5, 6]
 
 
+def test_turn_at_side_wall_with_new_track_is_one_ride() -> None:
+    """20240924 28:47: the rider turns at wall b, the tracker loses them and picks them up again."""
+    a = track(5, 0.0, ride_segment(12.0, 0.3, 0.95))
+    b = track(6, a[-1].t + 2.0, ride_segment(6.0, 0.96, 0.4))
+    rides, short = _assemble(a, b)
+    assert len(rides) == 1 and not short
+    assert rides[0].end_s == pytest.approx(b[-1].t)
+    assert rides[0].track_ids == [5, 6]
+
+
+def test_next_rider_from_same_wall_later_is_a_new_ride() -> None:
+    a = track(5, 0.0, ride_segment(12.0, 0.3, 0.95))
+    b = track(6, a[-1].t + 6.0, ride_segment(12.0, 0.96, 0.4))
+    rides, _ = _assemble(a, b)
+    assert len(rides) == 2
+
+
 def test_new_ride_far_away_is_not_a_continuation() -> None:
     a = track(5, 0.0, ride_segment(12.0, 0.7, 0.1))
     b = track(6, a[-1].t + 0.2, ride_segment(12.0, 0.8, 0.3, v=0.9))
@@ -121,8 +138,8 @@ def test_changeover_overlap_gives_two_rides() -> None:
 def test_padding_frames_and_ids() -> None:
     rides, _ = _assemble(track(1, 100.0, ride_segment(12.0)))
     r = rides[0]
-    assert r.clip_start_s == pytest.approx(r.start_s - 1.0)
-    assert r.clip_end_s == pytest.approx(r.end_s + 1.5)
+    assert r.clip_start_s == pytest.approx(r.start_s - 1.5)
+    assert r.clip_end_s == pytest.approx(r.end_s + 2.0)
     assert r.start_frame == round(r.start_s * SOURCE_FPS)
     assert r.ride_id == f"r{r.start_frame:06d}"
     assert 0 < r.confidence <= 1

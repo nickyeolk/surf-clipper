@@ -11,8 +11,8 @@ def test_default_config_loads_with_spec_defaults() -> None:
     cfg = load_config(DEFAULT)
     assert cfg.rides.confirm_window_s == 1.5
     assert cfg.rides.min_length_s == 10.0
-    assert cfg.rides.pad_before_s == 1.0
-    assert cfg.rides.pad_after_s == 1.5
+    assert cfg.rides.pad_before_s == 1.5
+    assert cfg.rides.pad_after_s == 2.0
     assert cfg.rides.frame_edge_grace_s == 2.0
     assert cfg.analysis.fps == 5
     assert cfg.server.host == "127.0.0.1"

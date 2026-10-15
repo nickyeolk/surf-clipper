@@ -87,3 +87,22 @@ Framing indicators tried (`scripts/edge_report.py`, riding frames cut off by the
 20240924 0%, 20241004 0%, portrait 8.8%, night HDR 22.2%. The HDR session is cut off more
 often yet completes 89.7%, and visible wave-face share (portrait 92.9%, HDR 79.6%) did not
 separate them either, so no automatic framing warning yet.
+
+## 2026-10-15 - wall returns; padding 1.5 s / 2 s
+
+* Wall returns (`_merge_wall_returns`, `rides.wall_return_max_s` = 4 s): a ride ending at a side
+  wall continues when a new track appears there within 4 s, close by, and rides back out.
+  Fixes 20240924 28:04 (end -11.7 s -> -1.9 s). A first version allowing 10 s merged two riders
+  on 20241004 (9:13, 6.4 s apart) and was tightened.
+* Padding: `scripts/pad_sweep.py` over before {1, 1.5, 2} x after {1.5, 2, 2.5, 3}. Chose
+  1.5 s / 2 s: SC-003 then holds on both archive sessions with 2.0 s p95 overhang.
+
+| Session | Recall | Precision | Complete | Tightness |
+| --- | --- | --- | --- | --- |
+| 20240924 | 100% | 100% | 96.2% | 2.00 s |
+| 20241004 | 100% | 98.7% | 96.0% | 2.00 s |
+| 20260928_IMG_1652 (not gating) | 96.2% | 91.1% | 79.2% | 2.40 s |
+| 20261012_110549566 | 100% | 100% | 90.8% | 3.04 s |
+
+Open: the night HDR session misses completeness (8 cut rides: 27:08 and 53:22 end ~11 s early,
+the rest are 1.5-5 s start or end errors) and is 0.04 s over the tightness target.

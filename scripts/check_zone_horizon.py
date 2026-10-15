@@ -20,7 +20,7 @@ w, h = int(sys.argv[2]), int(sys.argv[3])
 m = PoolMapping.from_corners(zone.corners).image_to_pool
 xs, ys = np.meshgrid(np.linspace(0, w, 200), np.linspace(0, h, 200))
 denom = m[2, 0] * xs + m[2, 1] * ys + m[2, 2]
-corner = np.array(zone.corners.back_a + (1.0,))
+corner = np.array((*zone.corners.back_a, 1.0))
 sign = np.sign(m[2] @ corner)
 folded = np.mean(np.sign(denom) != sign)
 print(f"{Path(sys.argv[1]).stem}: {folded:.1%} of the frame is beyond the zone's horizon")

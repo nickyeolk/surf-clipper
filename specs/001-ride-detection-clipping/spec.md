@@ -26,7 +26,7 @@ confirmed, compare the ride list to the hand labels, and play a few clips.
 
 1. **Given** a confirmed zone and a session with several riders taking turns, **When** processing
    finishes, **Then** each ride of at least the minimum length appears once in the ride list with
-   start, end and confidence, and has its own clip padded 1 s before and 1.5 s after.
+   start, end and confidence, and has its own clip padded 1.5 s before and 2 s after.
 2. **Given** a person sitting on a side wall for several minutes whose image overlaps the wave
    zone, **When** processing finishes, **Then** no ride is produced for them.
 3. **Given** a rider who acid-drops from a side wall, **When** processing finishes, **Then** the
@@ -162,7 +162,7 @@ and confirm every edit is still present.
 **Input and analysis**
 
 - **FR-001**: System MUST accept local MP4 or MOV phone video (H.264 or HEVC, 8-bit SDR or 10-bit
-  HDR including HLG and Dolby Vision, 720p to 4K, landscape or portrait, about 24–120 fps
+  HDR including HLG and Dolby Vision, 720p to 4K, landscape or portrait, about 24â€“120 fps
   constant or variable, up to 1.5 h), both phone originals and exports, honouring rotation
   metadata.
 - **FR-002**: System MUST analyse a reduced, tone-mapped proxy of the video while keeping the
@@ -224,7 +224,7 @@ and confirm every edit is still present.
 
 - **FR-019**: System MUST write a ride list containing, per ride: ID, start and end (seconds and
   frames), confidence, camera epoch, state timeline, truncation flags and lesson flag.
-- **FR-020**: System MUST export one clip per ride with 1 s of padding before and 1.5 s after,
+- **FR-020**: System MUST export one clip per ride with 1.5 s of padding before and 2 s after,
   frame-accurate, at final quality: each clip MUST keep the source's dynamic range and colour
   metadata (SDR stays SDR; HLG and HDR10 stay as they are; Dolby Vision keeps its HLG base layer
   when re-encoded). Clips are exported on demand after review, not automatically after processing:
@@ -271,11 +271,11 @@ HDR and held-out sessions), not only on average. Exception: sessions where too m
 is out of frame (see Edge Cases) are reported but do not gate these targets.
 
 - **SC-001**: At least 95% of hand-labelled rides at or above the minimum length are found
-  (matched at time overlap IoU ≥ 0.5).
+  (matched at time overlap IoU â‰¥ 0.5).
 - **SC-002**: At least 90% of detected rides match a hand-labelled ride.
 - **SC-003**: Clips are complete and tight. *Completeness*: at least 95% of labelled rides lie
-  entirely within their matched ride's padded clip (1 s before, 1.5 s after), so the tool may
-  start up to 1 s late or end up to 1.5 s early without cutting anything; missed rides count as
+  entirely within their matched ride's padded clip (1.5 s before, 2 s after; was 1 s / 1.5 s until 2026-10-15), so the tool may
+  start up to 1.5 s late or end up to 2 s early without cutting anything; missed rides count as
   incomplete. *Tightness*: at the 95th percentile, a clip extends no more than 3 s beyond the
   labelled ride at either end. Raw start/end errors are still reported (acid drops separately)
   as diagnostics. (Changed 2026-10-14 from "start and end error < 1 s at p95": a second either
@@ -294,13 +294,13 @@ is out of frame (see Edge Cases) are reported but do not gate these targets.
 ## Assumptions
 
 - One rider is normally on the wave at a time; lessons are the stated exception.
-- The camera is a phone on a stand, head-on to about 45° left or right, 1x or 0.5x zoom, with no
+- The camera is a phone on a stand, head-on to about 45Â° left or right, 1x or 0.5x zoom, with no
   panning or zooming during recording other than occasional bumps or re-positioning.
 - Riders wait on the side walls or side decks and enter the wave only from the side walls (acid
   drop or step-in); the back wall is not an entry point. One or both side walls may be out of
   frame.
 - Evaluation sessions (chosen by the user, 2026-10-13): `20260928_IMG_1652.MOV` (portrait, night),
-  `20240924.MP4` and `20241004.MP4` (720p archive, about 45° right, daylight),
+  `20240924.MP4` and `20241004.MP4` (720p archive, about 45Â° right, daylight),
   `20261012_110549566.mp4` (1080p HLG HDR, night, variable frame rate, recorded upside down), plus
   the staged bump session (to be filmed; held out from tuning).
 - One continuous file per session; multi-file sessions are out of scope.
@@ -318,36 +318,36 @@ is out of frame (see Edge Cases) are reported but do not gate these targets.
 
 ### Session 2026-10-13
 
-- Q: Does 001 deliver final-quality HDR-preserving per-ride clips, or preview clips only? → A:
+- Q: Does 001 deliver final-quality HDR-preserving per-ride clips, or preview clips only? â†’ A:
   Final-quality clips that keep the source's HDR and colour metadata (FR-020).
-- Q: What interface does 001 provide for zone confirmation and ride review? → A: A browser UI
+- Q: What interface does 001 provide for zone confirmation and ride review? â†’ A: A browser UI
   served by a local backend. Initially chosen as temporary; then adopted as the permanent
   architecture in place of a packaged desktop app (FR-021).
-- Q: Are per-ride clips exported automatically after processing, or on demand after review? → A: On
+- Q: Are per-ride clips exported automatically after processing, or on demand after review? â†’ A: On
   demand after review; only new or changed rides are re-encoded on later exports (FR-020, SC-006).
-- Q: Does 001's review screen include the full-resolution ride viewer? → A: No. 001 has frame
+- Q: Does 001's review screen include the full-resolution ride viewer? â†’ A: No. 001 has frame
   stepping and slow motion (needed for trimming); still capture and the full viewer come in 003
   (FR-021).
-- Q: Is the browser UI reachable from other devices (phone, tablet)? → A: Laptop only until the
+- Q: Is the browser UI reachable from other devices (phone, tablet)? â†’ A: Laptop only until the
   basics work; phone access considered in 003 (FR-025).
-- Q: Where do riders enter the wave? → A: Only from the side walls, never the back wall
-  (FR-004, FR-010–FR-013, FR-015). When the entry wall is out of frame, the ride starts at the
+- Q: Where do riders enter the wave? â†’ A: Only from the side walls, never the back wall
+  (FR-004, FR-010â€“FR-013, FR-015). When the entry wall is out of frame, the ride starts at the
   rider's first appearance (User Story 1, scenario 7).
-- Q: When does a ride end? → A: At the last frame the rider is on the wave face. Falling, or
+- Q: When does a ride end? â†’ A: At the last frame the rider is on the wave face. Falling, or
   being washed over the back into the whitewater, ends it even if the rider is still upright on
   the board; whitewater time is not part of the ride (FR-015; also the labelling rule).
   Time in the air above the face (ollies, airs) counts as on the wave: a landed air is part of
   the ride, a failed air ends when the rider hits the water or separates from the board. Brief
   excursions off the face band (up to the evidence gap, 1.5 s) therefore do not end a ride.
-- Q: Exactly which instant is a ride's start and end? → A: Start from sitting on the wall: the
+- Q: Exactly which instant is a ride's start and end? â†’ A: Start from sitting on the wall: the
   instant they leave the wall. Acid drop: the instant they leave the wall (the jump), not the
   run-up on the deck. Entry wall out of frame: the first frame they appear. End by a fall: the
   first frame they are clearly no longer riding the board (hand, knee or body in the water, or
   the board separating). Washed over the back: the first frame the feet are behind the face.
   Natural variation of about a second remains, so SC-003 measures clip completeness and
   tightness rather than exact boundary error.
-- Q: How are lessons clipped? → A: The whole lesson is one ride flagged "lesson" (FR-014).
-- Q: What about sessions where riders leave the frame mid-ride? → A: Accepted limitation: such
+- Q: How are lessons clipped? â†’ A: The whole lesson is one ride flagged "lesson" (FR-014).
+- Q: What about sessions where riders leave the frame mid-ride? â†’ A: Accepted limitation: such
   rides may split; reported but not gating; rider identification (002) may rejoin them.
-- Q: Which sessions form the evaluation set? → A: `20260928_IMG_1652`, `20240924`, `20241004`,
+- Q: Which sessions form the evaluation set? â†’ A: `20260928_IMG_1652`, `20240924`, `20241004`,
   `20261012_110549566`, plus the staged bump session (Assumptions).
