@@ -182,6 +182,12 @@
         Red dots: where people stood on boards in this session; riding should fall inside the
         grid. Green: the wave face estimated from the saved zone.
       </p>
+      {#if info.zone?.origin === 'proposed'}
+        <p class="small proposal">
+          <strong>Set automatically</strong> from the proposal so rides could be found. Check that
+          the side walls sit on the walls; saving (even unchanged) marks it as checked.
+        </p>
+      {/if}
       {#if info.proposal}
         {@const pr = info.proposal}
         <div class="proposal small" class:bad={pr.unreliable}>

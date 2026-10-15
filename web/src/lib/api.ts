@@ -15,6 +15,7 @@ export interface SessionSummary {
   exported: number
   analysed: boolean
   zone_confirmed: boolean
+  zone_checked: boolean
   job: Job | null
 }
 
@@ -178,7 +179,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   sessions: () => call<SessionSummary[]>('/sessions'),
-  session: (id: string) => call<{ probe: SourceInfo }>(`/sessions/${id}`),
+  session: (id: string) => call<{ probe: SourceInfo; zone_origin: string | null }>(`/sessions/${id}`),
   activity: (id: string) => call<Activity>(`/sessions/${id}/activity`),
   labels: (id: string) => call<LabelWork>(`/sessions/${id}/labels`),
   saveLabels: (id: string, work: LabelWork) =>

@@ -30,6 +30,7 @@
   let showShort = $state(false)
   let job = $state<Job | null>(null)
   let busy = $state(false)
+  let zoneOrigin = $state<string | null>(null)
   let stopAt: number | null = null
   // Reel: play the rides back to back (only the rides left after deleting others').
   let reel = $state(false)
@@ -49,6 +50,7 @@
       .then(([r, s, a, e]) => {
         rides = r
         probe = s.probe
+        zoneOrigin = s.zone_origin
         activity = a
         edits = e.edits
         minLength = r.settings.min_length_s
@@ -375,7 +377,12 @@
     <section class="player">
       <div class="titlebar">
         <h1>{probe.path.split(/[\\/]/).pop()} <span class="muted small">review</span></h1>
-        <span class="muted">{busy ? 'saving…' : status}</span>
+        <span class="muted">
+          {#if zoneOrigin === 'proposed'}
+            <a href={`#/zone/${sessionId}`} title="The wave zone was set automatically; checking it improves the clips">check the wave zone</a> ·
+          {/if}
+          {busy ? 'saving…' : status}
+        </span>
       </div>
       <!-- svelte-ignore a11y_media_has_caption -->
       <video bind:this={video} bind:paused src={api.videoUrl(sessionId)} preload="auto" {ontimeupdate}

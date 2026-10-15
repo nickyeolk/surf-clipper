@@ -10,8 +10,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from surfclip.config import load_config
-from surfclip.edits.log import confirmed_zone, read_edits
-from surfclip.store.schemas import Rides, StageName
+from surfclip.edits.log import append_edit, confirmed_zone, read_edits
+from surfclip.store.schemas import EditTarget, Rides, StageName
 from surfclip.store.session import SessionStore
 
 Report = Callable[[float, str], None]
@@ -73,8 +73,8 @@ def _overall(report: Report) -> Callable[[StageName, float, str], None]:
 
 
 def process_session(store: SessionStore, config_path: Path, report: Report) -> dict[str, object]:
-    """Analyse a session; find rides too when its zone is confirmed. Precomputes the zone
-    proposal so the zone editor opens quickly."""
+    """Analyse a session and find its rides, using the zone proposal when no zone has been
+    confirmed and the proposal is reliable; otherwise stop before rides for the zone editor."""
     import torch
 
     from surfclip.stages import default_pipeline  # heavy imports (torch) only when processing
@@ -87,18 +87,33 @@ def process_session(store: SessionStore, config_path: Path, report: Report) -> d
     def tell(fraction: float, message: str) -> None:
         report(fraction, message if gpu else f"{message} (no GPU found: on the CPU, much slower)")
 
-    default_pipeline().run(
-        store, cfg, until="rides" if has_zone else "track", progress=_overall(tell)
-    )
+    progress = _overall(tell)
+    default_pipeline().run(store, cfg, until="track", progress=progress)
+    proposal = None
     if not has_zone:
-        report(0.99, "proposing the wave zone")
+        # A reliable proposal is used straight away (recorded as an automatic confirmation, zone
+        # origin "proposed") so rides are ready to review; the user can check it in the editor.
+        tell(0.965, "proposing the wave zone")
         proposal = zone_proposal(store)
-        return {
-            "next": "zone",
-            "proposal_confidence": proposal.confidence if proposal else None,
-        }
+        if proposal is None or proposal.unreliable:
+            return {
+                "next": "zone",
+                "proposal_confidence": proposal.confidence if proposal else None,
+            }
+        zone = proposal.zone.model_copy(update={"origin": "proposed"})
+        append_edit(
+            store,
+            "confirm_zone",
+            EditTarget(epoch_id=zone.epoch_id),
+            {"zone": zone.model_dump(mode="json"), "how": "auto"},
+        )
+    default_pipeline().run(store, cfg, until="rides", progress=progress)
     rides = store.read_model("rides.json", Rides)
-    return {"next": "review", "rides": len(rides.rides)}
+    return {
+        "next": "review",
+        "rides": len(rides.rides),
+        "zone": "proposed" if proposal else "confirmed",
+    }
 
 
 def rerun_rides(

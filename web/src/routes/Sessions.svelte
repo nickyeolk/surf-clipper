@@ -69,7 +69,8 @@
     {#if addError}<span class="error small">{addError}</span>{/if}
     <p class="small muted">
       Analysis takes roughly an hour per hour of video (HDR takes longest). You can close the
-      browser meanwhile; it keeps going while the server runs.
+      browser meanwhile; it keeps going while the server runs. The wave zone is set from the
+      riders automatically when possible; a quick check in the zone editor improves the clips.
     </p>
   </div>
 
@@ -115,7 +116,9 @@
               {:else if s.analysed && !s.zone_confirmed}
                 <a class="button" href={`#/zone/${s.session_id}`}>Set wave zone →</a>
               {:else}
-                <a class="button secondary" href={`#/zone/${s.session_id}`}>Zone</a>
+                <a class="button secondary" href={`#/zone/${s.session_id}`}
+                  title={s.zone_confirmed && !s.zone_checked ? 'Set automatically from the proposal: worth a quick check' : ''}
+                  >Zone{s.zone_confirmed && !s.zone_checked ? ' (not checked)' : ''}</a>
                 {#if s.has_review_copy && s.rides !== null}
                   <a class="button" href={`#/review/${s.session_id}`}>Review</a>
                   <a class="button secondary" href={`#/label/${s.session_id}`}>Label</a>

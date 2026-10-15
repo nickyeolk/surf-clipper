@@ -59,6 +59,7 @@ class SessionSummary(BaseModel):
     exported: int
     analysed: bool  # people detected and tracked
     zone_confirmed: bool
+    zone_checked: bool  # confirmed by the user, not only the automatic proposal
     job: Job | None  # running analysis or re-run
 
 
@@ -186,7 +187,9 @@ def create_app(
                     labels_final=final_file.exists(),
                     exported=sum(1 for r in rides.rides if r.export) if rides else 0,
                     analysed="track" in s.stages and s.stages["track"].status == "done",
-                    zone_confirmed=confirmed_zone(read_edits(SessionStore(root, s))) is not None,
+                    zone_confirmed=(zone := confirmed_zone(read_edits(SessionStore(root, s))))
+                    is not None,
+                    zone_checked=zone is not None and zone.origin == "user",
                     job=work_jobs.active(s.session_id, "analyse")
                     or work_jobs.active(s.session_id, "rerun"),
                 )
@@ -249,8 +252,10 @@ def create_app(
 
     @app.get("/api/sessions/{sid}")
     def get_session(sid: str) -> dict[str, Any]:
+        zone = confirmed_zone(read_edits(store_of(sid)))
         return {
             "session": session_of(sid).model_dump(mode="json"),
+            "zone_origin": zone.origin if zone else None,
             "probe": read(folder(sid) / "probe.json", SourceInfo).model_dump(mode="json"),
         }
 
