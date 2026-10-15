@@ -23,7 +23,7 @@ for video in args.videos:
     labels = SessionLabels.model_validate_json(
         (args.labels_dir / f"{video.stem}.json").read_text(encoding="utf-8")
     )
-    rides = store.read_model("rides.json", Rides)
+    rides = store.read_model("rides.detected.json", Rides)
     cells: list[str] = []
     for b, a in grid:
         m = evaluate(

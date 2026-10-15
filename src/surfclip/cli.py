@@ -337,7 +337,8 @@ def eval_cmd(
     if not label_file.exists():
         raise _fail(f"no validated labels at {label_file}", 2)
     labels = SessionLabels.model_validate_json(label_file.read_text(encoding="utf-8"))
-    rides = store.read_model("rides.json", Rides)
+    # Score the tool's own detections: rides.json also contains the user's review edits.
+    rides = store.read_model("rides.detected.json", Rides)
     m = evaluate(
         [Span(r.start_s, r.end_s) for r in rides.rides],
         labels.rides,

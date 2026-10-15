@@ -22,7 +22,7 @@ def main() -> None:
     ap.add_argument("--labels-dir", type=Path, default=Path("labels/rides"))
     args = ap.parse_args()
     store = SessionStore.open(args.video, args.artifacts)
-    rides = store.read_model("rides.json", Rides).rides
+    rides = store.read_model("rides.detected.json", Rides).rides
     labels = SessionLabels.model_validate_json(
         (args.labels_dir / f"{args.video.stem}.json").read_text(encoding="utf-8")
     ).rides

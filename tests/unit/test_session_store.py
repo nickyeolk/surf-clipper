@@ -31,6 +31,14 @@ def test_open_creates_folder_and_session_record(source: Path, tmp_path: Path) ->
     assert reopened.session.created_at == store.session.created_at
 
 
+def test_name_in_other_case_opens_the_same_session(source: Path, tmp_path: Path) -> None:
+    """Windows drives ignore case: "session.mp4" must not become a second session."""
+    store = SessionStore.open(source, tmp_path / "artifacts")
+    other = SessionStore.open(source.with_name("session.mp4"), tmp_path / "artifacts")
+    assert other.root == store.root
+    assert other.session.source_path == str(source)
+
+
 def test_artifacts_inside_source_folder_are_refused(source: Path) -> None:
     with pytest.raises(SourceLocationError):
         SessionStore.open(source, source.parent / "artifacts")

@@ -20,6 +20,18 @@ class SourceLocationError(ValueError):
     """Raised when outputs would be written next to (or inside) the source footage."""
 
 
+def _true_case(source: Path) -> Path:
+    """The file name as stored on disk. Windows drives (and /mnt/c in WSL) ignore case, so
+    "20240924.mp4" opens "20240924.MP4"; without this each spelling became its own session."""
+    if not source.parent.is_dir():
+        return source
+    names = [p.name for p in source.parent.iterdir()]
+    if source.name in names:
+        return source
+    same = [n for n in names if n.lower() == source.name.lower()]
+    return source.with_name(same[0]) if len(same) == 1 else source
+
+
 def session_id_for(source: Path) -> str:
     """Short, stable id from the source's absolute path, size and modification time."""
     st = source.stat()
@@ -48,7 +60,7 @@ class SessionStore:
 
     @classmethod
     def open(cls, source: Path, artifacts_root: Path) -> SessionStore:
-        source = source.resolve()
+        source = _true_case(source.resolve())
         artifacts_root = artifacts_root.resolve()
         if artifacts_root.is_relative_to(source.parent):
             raise SourceLocationError(
