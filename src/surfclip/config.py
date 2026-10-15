@@ -122,6 +122,7 @@ class ReviewConfig(_Section):
 class ServerConfig(_Section):
     host: str
     port: int
+    source_dirs: list[str]
 
     @field_validator("host")
     @classmethod

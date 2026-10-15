@@ -37,7 +37,9 @@ rng = np.random.default_rng(args.seed)
 picks = []
 for r in rng.permutation(len(rides))[: args.n]:
     ride = rides[int(r)]
-    cands = [o for t in ride.track_ids for o in by_track.get(t, []) if ride.start_s <= o.t <= ride.end_s]
+    cands = [
+        o for t in ride.track_ids for o in by_track.get(t, []) if ride.start_s <= o.t <= ride.end_s
+    ]
     if cands:
         picks.append(cands[int(rng.integers(len(cands)))])
 picks.sort(key=lambda o: o.t)
@@ -51,9 +53,26 @@ TONEMAP = (
 def frame_at(t: float) -> np.ndarray:
     vf = (TONEMAP if info.hdr_format != "none" else "") + "format=bgr24"
     raw = subprocess.run(
-        ["ffmpeg", "-v", "error", "-ss", f"{t:.3f}", "-i", info.path, "-frames:v", "1",
-         "-vf", vf, "-f", "image2pipe", "-vcodec", "png", "-"],
-        capture_output=True, check=True,
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-ss",
+            f"{t:.3f}",
+            "-i",
+            info.path,
+            "-frames:v",
+            "1",
+            "-vf",
+            vf,
+            "-f",
+            "image2pipe",
+            "-vcodec",
+            "png",
+            "-",
+        ],
+        capture_output=True,
+        check=True,
     ).stdout
     return cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
 
@@ -96,16 +115,32 @@ for o in picks:
             if cc >= 0.3:
                 cv2.circle(crop, (int(x), int(y)), max(2, int(h / 60)), (0, 255, 255), -1)
     scale = TILE / max(crop.shape[:2])
-    crop = cv2.resize(crop, (max(1, int(crop.shape[1] * scale)), max(1, int(crop.shape[0] * scale))))
+    crop = cv2.resize(
+        crop, (max(1, int(crop.shape[1] * scale)), max(1, int(crop.shape[0] * scale)))
+    )
     tile = np.full((TILE + 44, TILE, 3), 24, np.uint8)
     tile[: crop.shape[0], : crop.shape[1]] = crop
     aspect = h / max(x1 - x0, 1)
-    cv2.putText(tile, f"box: {o.stance} ({aspect:.2f})", (4, TILE + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-    cv2.putText(tile, f"pose: {label}", (4, TILE + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (120, 220, 255), 1)
+    cv2.putText(
+        tile,
+        f"box: {o.stance} ({aspect:.2f})",
+        (4, TILE + 16),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.45,
+        (255, 255, 255),
+        1,
+    )
+    cv2.putText(
+        tile, f"pose: {label}", (4, TILE + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (120, 220, 255), 1
+    )
     tiles.append(tile)
 
 cols = 6
-rows = [np.hstack(tiles[i : i + cols] + [np.full_like(tiles[0], 24)] * (cols - len(tiles[i : i + cols])))
-        for i in range(0, len(tiles), cols)]
+rows = [
+    np.hstack(
+        tiles[i : i + cols] + [np.full_like(tiles[0], 24)] * (cols - len(tiles[i : i + cols]))
+    )
+    for i in range(0, len(tiles), cols)
+]
 cv2.imwrite(str(args.out), np.vstack(rows))
 print(f"wrote {args.out} ({len(tiles)} riders)")

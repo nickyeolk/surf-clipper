@@ -121,3 +121,47 @@ def test_hdr_clip_keeps_transfer_and_10_bit(tmp_path: Path, trc: str) -> None:
         "bt2020nc",
     )
     assert abs(int(s["nb_read_frames"]) - round(4.5 * 30)) <= 1
+
+
+def test_reel_joins_clips_in_order(tmp_path: Path) -> None:
+    """Two rides exported and joined into one video without re-encoding (reel)."""
+    from datetime import UTC, datetime
+
+    from surfclip.media.export import export_reel
+    from surfclip.store.schemas import Rides, Session, SourceSummary
+    from surfclip.store.session import SessionStore
+
+    src = tmp_path / "footage" / "src.mp4"
+    src.parent.mkdir()
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30",
+         "-t", "20", "-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", "ultrafast", str(src)],
+        check=True,
+    )  # fmt: skip
+    info = probe(src)
+    root = tmp_path / "artifacts" / "s1"
+    root.mkdir(parents=True)
+    store = SessionStore(
+        root,
+        Session(session_id="s1", source_path=str(src), source_size=1, source_mtime=0,
+                created_at=datetime(2026, 10, 15, tzinfo=UTC)),
+    )  # fmt: skip
+    store.write_model("probe.json", info)
+    second, first = _ride(12.0, 15.0, info.avg_fps), _ride(3.0, 5.0, info.avg_fps)
+    second = second.model_copy(update={"ride_id": "r000360"})
+    rides = Rides(
+        session_id="s1",
+        source=SourceSummary(path=str(src), fps=info.avg_fps, hdr_format="none"),
+        settings={"min_length_s": 1, "pad_before_s": 1.0, "pad_after_s": 1.5},  # type: ignore[arg-type]
+        rides=[second, first],
+    )
+    store.write_model("rides.json", rides)
+    reel = export_reel(store, CFG, cpu=True)
+    frames = int(_stream(reel)["nb_read_frames"])
+    expected = round(((5.0 + 1.5) - (3.0 - 1.0) + (15.0 + 1.5) - (12.0 - 1.0)) * info.avg_fps)
+    assert abs(frames - expected) <= 2
+    assert {p.name for p in (root / "clips").iterdir()} == {
+        "r000001.mp4",
+        "r000360.mp4",
+        "reel.mp4",
+    }

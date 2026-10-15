@@ -227,7 +227,51 @@ def export_rides(
         )
         store.write_model(EXPORTS_FILE, exports)
         done.append(ride.ride_id)
+    if progress:
+        progress(len(todo), len(todo), "done")
     # Re-read: the user may have edited rides while clips were encoding.
     latest = store.read_model("rides.json", Rides)
     store.write_model("rides.json", attach_exports(latest, exports, store))
     return done, skipped
+
+
+REEL_FILE = "clips/reel.mp4"
+
+
+def export_reel(
+    store: SessionStore,
+    cfg: ExportConfig,
+    *,
+    ride_ids: list[str] | None = None,
+    cpu: bool = False,
+    progress: Callable[[int, int, str], None] | None = None,
+) -> Path:
+    """All (or the given) rides as one video, in time order: the per-ride clips (exported first
+    when new or changed) joined without re-encoding. They share codec settings, so the concat
+    demuxer can copy the streams."""
+    export_rides(store, cfg, ride_ids=ride_ids, cpu=cpu, progress=progress)
+    rides = store.read_model("rides.json", Rides)
+    chosen = sorted(
+        (r for r in rides.rides if r.export and (ride_ids is None or r.ride_id in ride_ids)),
+        key=lambda r: r.start_s,
+    )
+    if not chosen:
+        raise RuntimeError("no rides to put in the reel")
+    out = store.path(REEL_FILE)
+    listing = out.with_name("reel.txt")
+    listing.write_text(
+        "".join(f"file '{Path(r.export.path).name}'\n" for r in chosen if r.export),
+        encoding="utf-8",
+    )
+    tmp = out.with_name("reel.tmp.mp4")
+    result = subprocess.run(
+        ["ffmpeg", "-v", "error", "-nostdin", "-y", "-f", "concat", "-safe", "0",
+         "-i", str(listing), "-c", "copy", "-movflags", "+faststart", str(tmp)],
+        capture_output=True, text=True, check=False,
+    )  # fmt: skip
+    listing.unlink(missing_ok=True)
+    if result.returncode != 0:
+        tmp.unlink(missing_ok=True)
+        raise RuntimeError(f"joining clips failed: {result.stderr.strip()[-500:]}")
+    tmp.replace(out)
+    return out

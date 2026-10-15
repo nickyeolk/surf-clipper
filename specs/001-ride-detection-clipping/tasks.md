@@ -110,7 +110,7 @@ time it (SC-004), and compare with the hand-made zone file from US1
 - [x] T037 [US2] Implement the FastAPI app bound to `server.host` (127.0.0.1) with error format, static serving of web/dist, and background job runner with progress/eta in src/surfclip/api/app.py and src/surfclip/api/jobs.py; add `surfclip serve` in src/surfclip/cli.py
 - [ ] T038 [US2] Implement session and zone routes per contracts/http-api.md (PUT zone appends `confirm_zone` with `how` = accepted/edited/drawn and triggers ride stages) in src/surfclip/api/routes_sessions.py and src/surfclip/api/routes_zones.py; until T035 passes
 - [x] T039 [P] [US2] Implement the typed API client in web/src/lib/api.ts
-- [ ] T040 [US2] Build the Sessions screen (add a source path, min length setting before processing, job progress) in web/src/routes/Sessions.svelte
+- [x] T040 [US2] Build the Sessions screen (add a source path, min length setting before processing, job progress) in web/src/routes/Sessions.svelte
 - [ ] T041 [US2] Build the Zone editor in web/src/routes/ZoneEditor.svelte: keyframe canvas, draggable role-labelled corners (including off-frame corners on a padded canvas), entry side-wall toggles, side waiting-area polygons, one-click Accept, "unreliable proposal" banner with Draw mode, zone shown clipped at frame edges
 - [ ] T042 [US2] Measure zone setup time on each sample session and record SC-004 results in specs/001-ride-detection-clipping/eval-log.md
 
@@ -164,7 +164,7 @@ edits remain and detection is not re-run (cache hits); seeks ≤ 1 s, frame step
 - [x] T056 [US4] Implement edit re-attachment on re-run in src/surfclip/edits/apply.py; until T051 passes
 - [ ] T057 [US4] Implement rides, edits, export, rerun and media routes (HTTP Range) per contracts/http-api.md in src/surfclip/api/routes_rides.py and src/surfclip/api/routes_media.py; until T052 passes. *(2026-10-15: rides, edits (+ `undo`), export jobs, clip and thumbnail routes done in src/surfclip/api/app.py and api/jobs.py; rerun route still open)*
 - [ ] T058 [US4] Build the player in web/src/lib/player/: buffered ride segment playback, frame step ←/→ using `requestVideoFrameCallback` with exact-frame endpoint fallback, slow motion (0.25×/0.5×), thumbnail-strip timeline with remap markers
-- [ ] T059 [US4] Build the Review screen in web/src/routes/Review.svelte: ride list with thumbnails sorted lowest confidence first, lesson/truncated flags, short-attempt list, trim (set in/out at current frame), split at current frame, merge with neighbour, delete, add missed ride, re-run with settings, Export button (only new/changed rides). *(2026-10-15: done except re-run with settings; frame step and 0.25×/0.5× use the review copy; per-ride thumbnails instead of sprite sheets)*
+- [ ] T059 [US4] Build the Review screen in web/src/routes/Review.svelte: ride list with thumbnails sorted lowest confidence first, lesson/truncated flags, short-attempt list, trim (set in/out at current frame), split at current frame, merge with neighbour, delete, add missed ride, re-run with settings, Export button (only new/changed rides). *(2026-10-16: re-run with min ride length, play all rides back to back and export as one video added; frame step and 0.25×/0.5× use the review copy; per-ride thumbnails instead of sprite sheets)*
 - [ ] T060 [US4] Measure SC-009 (seek and frame-step latency) and SC-008 (hands-on time) on a 1 h session and record in specs/001-ride-detection-clipping/eval-log.md
 
 **Checkpoint**: All four stories work; full session workflow in the browser

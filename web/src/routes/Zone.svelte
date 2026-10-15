@@ -215,7 +215,7 @@
       </div>
       <div class="row">
         <button class="primary" disabled={!valid || saving} onclick={save}>Save & re-run rides</button>
-        <a class="button secondary" href={`#/label/${sessionId}`}>Label rides →</a>
+        <a class="button secondary" href={`#/review/${sessionId}`}>Review rides →</a>
       </div>
       <p class="small">{status}</p>
     </aside>

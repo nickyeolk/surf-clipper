@@ -8,6 +8,7 @@ Chrome). HDR sources are tone-mapped here only; final clips keep HDR. No audio.
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 from surfclip.config import ReviewConfig
@@ -81,14 +82,30 @@ def review_command(info: SourceInfo, out: Path, cfg: ReviewConfig, *, cpu: bool)
     ]
 
 
-def make_review_copy(info: SourceInfo, out: Path, cfg: ReviewConfig, *, cpu: bool = False) -> None:
+def make_review_copy(
+    info: SourceInfo,
+    out: Path,
+    cfg: ReviewConfig,
+    *,
+    cpu: bool = False,
+    progress: Callable[[float, str], None] | None = None,
+) -> None:
     tmp = out.with_name(out.stem + ".tmp.mp4")
-    result = subprocess.run(
-        review_command(info, tmp, cfg, cpu=cpu), capture_output=True, text=True, check=False
-    )
-    if result.returncode != 0:
+    cmd = review_command(info, tmp, cfg, cpu=cpu)
+    cmd[-1:-1] = ["-progress", "pipe:1", "-nostats"]  # key=value progress lines on stdout
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        if progress and line.startswith("out_time_us=") and info.duration_s > 0:
+            try:
+                done_s = int(line.split("=", 1)[1]) / 1e6
+            except ValueError:
+                continue
+            progress(min(1.0, done_s / info.duration_s), "making the preview copy")
+    _, stderr = proc.communicate()
+    if proc.returncode != 0:
         tmp.unlink(missing_ok=True)
-        raise RuntimeError(f"review copy failed: {result.stderr.strip()[-500:]}")
+        raise RuntimeError(f"review copy failed: {stderr.strip()[-500:]}")
     tmp.replace(out)
 
 

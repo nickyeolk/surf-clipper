@@ -11,17 +11,26 @@ from __future__ import annotations
 import logging
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from surfclip.config import Config
 from surfclip.store.schemas import StageName
 from surfclip.store.session import SessionStore, cache_key
 
+Progress = Callable[[float, str], None]  # fraction of the stage done (0..1), message
+PipelineProgress = Callable[[StageName, float, str], None]
+
+
+def _no_progress(fraction: float, message: str) -> None:
+    pass
+
 
 @dataclass(frozen=True)
 class StageContext:
     store: SessionStore
     config: Config
+    progress: Progress = _no_progress
 
 
 class Stage(ABC):
@@ -70,7 +79,12 @@ class Pipeline:
         self.stages = stages
 
     def run(
-        self, store: SessionStore, config: Config, *, until: StageName | None = None
+        self,
+        store: SessionStore,
+        config: Config,
+        *,
+        until: StageName | None = None,
+        progress: PipelineProgress | None = None,
     ) -> RunReport:
         log = _session_logger(store)
         report = RunReport()
@@ -91,8 +105,15 @@ class Pipeline:
                 log.info("%s running (%s)", stage.name, key)
                 store.mark_running(stage.name)
                 started = time.perf_counter()
+                name = stage.name
+
+                def stage_progress(fraction: float, message: str, name: StageName = name) -> None:
+                    if progress is not None:
+                        progress(name, fraction, message)
+
+                stage_progress(0.0, "running")
                 try:
-                    outputs = stage.run(StageContext(store, config))
+                    outputs = stage.run(StageContext(store, config, stage_progress))
                 except Exception as exc:
                     store.mark_failed(stage.name, f"{type(exc).__name__}: {exc}")
                     log.error("%s failed: %s", stage.name, exc)
@@ -101,6 +122,8 @@ class Pipeline:
                 report.seconds[stage.name] = time.perf_counter() - started
                 report.ran.append(stage.name)
                 log.info("%s done in %.1fs", stage.name, report.seconds[stage.name])
+            if progress is not None:
+                progress(stage.name, 1.0, "done")
             if stage.name == until:
                 break
         return report

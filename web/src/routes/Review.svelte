@@ -31,6 +31,11 @@
   let job = $state<Job | null>(null)
   let busy = $state(false)
   let stopAt: number | null = null
+  // Reel: play the rides back to back (only the rides left after deleting others').
+  let reel = $state(false)
+  let reelIdx = $state(0)
+  let minLength = $state(10)
+  let rerunJob = $state<Job | null>(null)
 
   const RATES = [0.25, 0.5, 1, 2, 4]
   const ZOOM_S = 60
@@ -46,6 +51,7 @@
         probe = s.probe
         activity = a
         edits = e.edits
+        minLength = r.settings.min_length_s
         selectedId = sortedRides()[0]?.ride_id ?? null
       })
       .catch((e) => (error = e.message))
@@ -103,6 +109,22 @@
       : []),
   ])
   const zoomFrom = $derived(Math.max(0, Math.min(current - ZOOM_S / 2, duration - ZOOM_S)))
+  const reelOffsets = $derived.by(() => {
+    const out: number[] = []
+    let acc = 0
+    for (const r of rideList) {
+      out.push(acc)
+      acc += r.clip_end_s - r.clip_start_s
+    }
+    out.push(acc)
+    return out
+  })
+  const reelTotal = $derived(reelOffsets[reelOffsets.length - 1] ?? 0)
+  const reelPos = $derived.by(() => {
+    const r = rideList[reelIdx]
+    if (!r) return 0
+    return reelOffsets[reelIdx] + Math.max(0, Math.min(r.clip_end_s - r.clip_start_s, current - r.clip_start_s))
+  })
 
   function sortedRides(): Ride[] {
     if (!rides) return []
@@ -130,10 +152,53 @@
   function ontimeupdate() {
     if (!video) return
     current = video.currentTime
+    if (reel) {
+      const r = rideList[reelIdx]
+      if (r && current >= r.clip_end_s - 0.05) {
+        if (reelIdx + 1 < rideList.length) goReel(reelIdx + 1, true)
+        else video.pause()
+      }
+      return
+    }
     if (stopAt !== null && current >= stopAt) {
       video.pause()
       stopAt = null
     }
+  }
+
+  // ---- reel -----------------------------------------------------------------------------------
+  function goReel(i: number, play: boolean) {
+    const r = rideList[i]
+    if (!r || !video) return
+    reel = true
+    reelIdx = i
+    selectedId = r.ride_id
+    stopAt = null
+    seek(r.clip_start_s)
+    if (play) void video.play()
+  }
+  function startReel() {
+    if (reel) {
+      reel = false
+      video?.pause()
+      return
+    }
+    goReel(0, true) // from the first ride; clicking a ride in the list jumps there
+  }
+  function reelSeek(e: MouseEvent) {
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const pos = ((e.clientX - box.left) / box.width) * reelTotal
+    let i = 0
+    while (i + 1 < rideList.length && reelOffsets[i + 1] <= pos) i++
+    const r = rideList[i]
+    reel = true
+    reelIdx = i
+    selectedId = r.ride_id
+    seek(r.clip_start_s + pos - reelOffsets[i])
+  }
+  function leaveReel(t: number) {
+    reel = false
+    seek(t)
   }
   function playSelected() {
     if (!selected || !video) return
@@ -144,6 +209,11 @@
 
   // ---- selection ----------------------------------------------------------------------------
   function select(id: string, play = false) {
+    const ri = rideList.findIndex((x) => x.ride_id === id)
+    if (reel && ri >= 0) {
+      goReel(ri, !paused || play)
+      return
+    }
     selectedId = id
     const r = rideList.find((x) => x.ride_id === id)
     const s = shorts.find((x) => x.ride_id === id)
@@ -235,14 +305,29 @@
   }
 
   // ---- export -------------------------------------------------------------------------------
-  async function exportClips(ids?: string[]) {
+  async function exportClips(ids?: string[], asReel = false) {
     try {
-      job = await api.exportClips(sessionId, ids)
+      job = await api.exportClips(sessionId, ids, asReel)
       while (job && (job.status === 'queued' || job.status === 'running')) {
         await new Promise((r) => setTimeout(r, 1000))
         job = await api.job(job.job_id)
       }
       rides = await api.rides(sessionId)
+    } catch (e) {
+      status = (e as Error).message
+    }
+  }
+
+  async function rerun() {
+    if (!(minLength > 0)) return
+    try {
+      rerunJob = await api.rerun(sessionId, minLength)
+      while (rerunJob && (rerunJob.status === 'queued' || rerunJob.status === 'running')) {
+        await new Promise((r) => setTimeout(r, 1000))
+        rerunJob = await api.job(rerunJob.job_id)
+      }
+      rides = await api.rides(sessionId)
+      edits = (await api.edits(sessionId)).edits
     } catch (e) {
       status = (e as Error).message
     }
@@ -267,6 +352,9 @@
     else if (k === 'k') keepShort()
     else if (k === 'n') addRide()
     else if (k === 'u') undo()
+    else if (k === 'r') startReel()
+    else if (k === ',' && reel) goReel(Math.max(0, reelIdx - 1), !paused)
+    else if (k === '.' && reel) goReel(Math.min(rideList.length - 1, reelIdx + 1), !paused)
     else if (k === 'Escape') pendingStart = null
     else if (k === '+' || k === '=') setRate(RATES[Math.min(RATES.length - 1, RATES.indexOf(rate) + 1)])
     else if (k === '-') setRate(RATES[Math.max(0, RATES.indexOf(rate) - 1)])
@@ -305,10 +393,30 @@
           {/each}
         </span>
       </div>
+      <div class="reel">
+        <button class:active={reel} onclick={startReel} disabled={rideList.length === 0}
+          title="Play the rides back to back (r)">{reel ? '■ stop playing all' : '▶ play all rides'}</button>
+        {#if reel}
+          <button onclick={() => goReel(Math.max(0, reelIdx - 1), !paused)} title="Previous ride (,)">⏮</button>
+          <button onclick={() => goReel(Math.min(rideList.length - 1, reelIdx + 1), !paused)} title="Next ride (.)">⏭</button>
+          <span class="time small">ride {reelIdx + 1}/{rideList.length} · {clock(reelPos)} / {clock(reelTotal)}</span>
+        {/if}
+      </div>
+      {#if reel}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="reelbar" onclick={reelSeek} role="slider" tabindex="-1" aria-label="All rides"
+          aria-valuemin={0} aria-valuemax={reelTotal} aria-valuenow={reelPos}>
+          {#each rideList as r, i (r.ride_id)}
+            <span class="seg" class:cur={i === reelIdx}
+              style:width="{((r.clip_end_s - r.clip_start_s) / reelTotal) * 100}%"></span>
+          {/each}
+          <span class="head" style:left="{(reelPos / Math.max(reelTotal, 1e-6)) * 100}%"></span>
+        </div>
+      {/if}
       <Timeline from={0} to={duration} {bars} {activity} {current} {selectedId} {pendingStart}
-        onseek={seek} onselect={(id) => select(id)} />
+        onseek={leaveReel} onselect={(id) => select(id)} />
       <Timeline from={zoomFrom} to={zoomFrom + ZOOM_S} {bars} {activity} {current} {selectedId}
-        {pendingStart} onseek={seek} onselect={(id) => select(id)} />
+        {pendingStart} onseek={leaveReel} onselect={(id) => select(id)} />
       <p class="muted small">
         Top: whole session · bottom: ±30 s around the playhead. Bars: <span style:color={COLOUR.ride}>ride</span>
         · <span style:color={COLOUR.edited}>changed by you</span> · <span style:color={COLOUR.exported}>exported</span>
@@ -323,7 +431,8 @@
           previous/next · <kbd>p</kbd> play clip · <kbd>[</kbd>/<kbd>]</kbd> start/end to playhead ·
           <kbd>s</kbd> split at playhead · <kbd>m</kbd> merge with next · <kbd>x</kbd>/<kbd>Del</kbd>
           delete · <kbd>k</kbd> keep short attempt · <kbd>n</kbd> add a missed ride (start, then end) ·
-          <kbd>u</kbd>/<kbd>Ctrl</kbd>+<kbd>Z</kbd> undo
+          <kbd>u</kbd>/<kbd>Ctrl</kbd>+<kbd>Z</kbd> undo · <kbd>r</kbd> play all rides back to back,
+          then <kbd>,</kbd>/<kbd>.</kbd> previous/next ride
         </p>
       </details>
     </section>
@@ -331,15 +440,25 @@
     <aside class="rides">
       <div class="progress">
         <span><strong>{rideList.length}</strong> rides · {exported} exported</span>
-        <button class="primary" disabled={job?.status === 'running' || job?.status === 'queued'}
-          onclick={() => exportClips()} title="Encode clips for new or changed rides">
-          Export {toExport > 0 ? `${toExport} clip${toExport === 1 ? '' : 's'}` : 'all (up to date)'}
+      </div>
+      <div class="row">
+        <button class="primary" disabled={job?.status === 'running' || job?.status === 'queued' || rideList.length === 0}
+          onclick={() => exportClips()} title="One file per ride; only new or changed rides are encoded">
+          Export {toExport > 0 ? `${toExport} clip${toExport === 1 ? '' : 's'}` : 'clips (up to date)'}
+        </button>
+        <button disabled={job?.status === 'running' || job?.status === 'queued' || rideList.length === 0}
+          onclick={() => exportClips(undefined, true)} title="All rides in this list joined into one video">
+          Export as one video
         </button>
       </div>
       {#if job}
         <div class="job small">
           {#if job.status === 'failed'}
             <span class="error">Export failed: {job.error}</span>
+          {:else if job.status === 'done' && job.result.reel}
+            One video of {rideList.length} rides →
+            <a href={`${api.reelUrl(sessionId)}?t=${Date.now()}`} target="_blank" rel="noreferrer">open ↗</a>
+            <code>{job.result.reel}</code>
           {:else if job.status === 'done'}
             Exported {job.result.exported?.length ?? 0}, {job.result.up_to_date?.length ?? 0} already up to
             date → <code>{job.result.folder}</code>
@@ -348,6 +467,18 @@
           {/if}
         </div>
       {/if}
+      <div class="row small">
+        <label title="Rides shorter than this become short attempts">min ride
+          <input class="num" type="number" min="1" step="1" bind:value={minLength} /> s</label>
+        <button onclick={rerun}
+          disabled={rerunJob?.status === 'running' || rerunJob?.status === 'queued' || minLength === rides.settings.min_length_s}
+          title="Find rides again with this setting; your edits are kept">re-run</button>
+        {#if rerunJob && (rerunJob.status === 'running' || rerunJob.status === 'queued')}
+          <span class="muted">finding rides…</span>
+        {:else if rerunJob?.status === 'failed'}
+          <span class="error">{rerunJob.error}</span>
+        {/if}
+      </div>
       <div class="row small">
         <label><input type="checkbox" bind:checked={byConfidence} /> least confident first</label>
         <label><input type="checkbox" bind:checked={showShort} /> short attempts ({shorts.length})</label>
@@ -398,6 +529,10 @@
           undo
         </button>
       </div>
+      {#if rideList.length === 0}
+        <p class="small">No rides found. If people were riding, check the
+          <a href={`#/zone/${sessionId}`}>wave zone</a>, or lower the minimum ride length.</p>
+      {/if}
       <ol class="list">
         {#each items as it (it.id)}
           <li class:sel={it.id === selectedId}>
@@ -442,6 +577,43 @@
   }
   .job code {
     word-break: break-all;
+  }
+  .reel {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin: 4px 0;
+  }
+  .reelbar {
+    position: relative;
+    display: flex;
+    height: 18px;
+    gap: 2px;
+    margin: 4px 0 8px;
+    cursor: pointer;
+  }
+  .reelbar .seg {
+    background: #1f6feb;
+    opacity: 0.55;
+    border-radius: 2px;
+  }
+  .reelbar .seg.cur {
+    opacity: 1;
+  }
+  .reelbar .head {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 2px;
+    background: #ff7b72;
+  }
+  .num {
+    width: 4em;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 4px;
   }
   .muted-tag {
     background: #2d2f33;

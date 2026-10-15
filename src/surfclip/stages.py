@@ -96,7 +96,13 @@ class ReviewCopyStage(Stage):
 
     def run(self, ctx: StageContext) -> list[str]:
         info = ctx.store.read_model("probe.json", SourceInfo)
-        make_review_copy(info, ctx.store.path("review.mp4"), ctx.config.review, cpu=self.cpu)
+        make_review_copy(
+            info,
+            ctx.store.path("review.mp4"),
+            ctx.config.review,
+            cpu=self.cpu,
+            progress=ctx.progress,
+        )
         return ["review.mp4"]
 
 
@@ -130,6 +136,7 @@ class DetectStage(Stage):
                     yield from _detect_chunk(detector, buf)
                     done += len(buf)
                     buf = []
+                    ctx.progress(min(1.0, done / total), f"finding people: {done}/{total} frames")
                     if done % (self.chunk * 20) == 0:
                         rate = done / (time.perf_counter() - started)
                         log.info("detect %d/%d frames (%.0f/s)", done, total, rate)

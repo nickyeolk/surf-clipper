@@ -13,6 +13,16 @@ export interface SessionSummary {
   labels_total: number
   labels_final: boolean
   exported: number
+  analysed: boolean
+  zone_confirmed: boolean
+  job: Job | null
+}
+
+export interface SourceVideo {
+  path: string
+  name: string
+  size_bytes: number
+  session_id: string | null
 }
 
 export type Verdict = '?' | 'ok' | 'fix' | 'no' | 'add'
@@ -143,7 +153,7 @@ export interface Job {
   status: 'queued' | 'running' | 'done' | 'failed'
   progress: number
   message: string
-  result: { exported?: string[]; up_to_date?: string[]; folder?: string }
+  result: { exported?: string[]; up_to_date?: string[]; folder?: string; reel?: string; next?: string; rides?: number; short_attempts?: number }
   error: string | null
 }
 
@@ -195,8 +205,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ op, target, payload }),
     }),
-  exportClips: (id: string, rides?: string[]) =>
-    call<Job>(`/sessions/${id}/export`, { method: 'POST', body: JSON.stringify({ rides: rides ?? null }) }),
+  exportClips: (id: string, rides?: string[], reel = false) =>
+    call<Job>(`/sessions/${id}/export`, { method: 'POST', body: JSON.stringify({ rides: rides ?? null, reel }) }),
+  reelUrl: (id: string) => `/api/sessions/${id}/media/reel.mp4`,
+  sources: () => call<SourceVideo[]>('/sources'),
+  addSession: (sourcePath: string, minLength: number | null) =>
+    call<{ session_id: string; job: Job }>('/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ source_path: sourcePath, min_length_s: minLength }),
+    }),
+  rerun: (id: string, minLength: number) =>
+    call<Job>(`/sessions/${id}/rerun`, { method: 'POST', body: JSON.stringify({ min_length_s: minLength }) }),
   job: (jobId: string) => call<Job>(`/jobs/${jobId}`),
   thumbUrl: (id: string, t: number) => `/api/sessions/${id}/media/thumb.jpg?t=${(Math.round(t * 2) / 2).toFixed(1)}`,
   clipUrl: (id: string, rideId: string) => `/api/sessions/${id}/media/clips/${rideId}.mp4`,

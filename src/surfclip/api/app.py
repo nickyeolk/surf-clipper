@@ -23,10 +23,17 @@ from surfclip.config import DEFAULT_CONFIG_PATH, load_config
 from surfclip.edits.log import append_edit, confirmed_zone, read_edits
 from surfclip.edits.rebuild import rebuild_rides
 from surfclip.eval.labels import LabelError, LabelWork, finalize, work_from_rides
-from surfclip.media.export import export_rides, read_exports
+from surfclip.media.export import REEL_FILE, export_reel, export_rides, read_exports
 from surfclip.media.review import thumbnail
+from surfclip.process import (
+    SourceNotAllowedError,
+    allowed_source,
+    list_sources,
+    process_session,
+    rerun_rides,
+)
 from surfclip.store.schemas import EditTarget, Rides, Session, SourceInfo, UserEdit, Zone
-from surfclip.store.session import SessionStore
+from surfclip.store.session import SessionStore, SourceLocationError, session_id_for
 from surfclip.zone.editing import confirm_zone, display_size, keyframe, rider_feet, zone_proposal
 from surfclip.zone.geometry import GeometryError
 
@@ -50,6 +57,9 @@ class SessionSummary(BaseModel):
     labels_total: int
     labels_final: bool
     exported: int
+    analysed: bool  # people detected and tracked
+    zone_confirmed: bool
+    job: Job | None  # running analysis or re-run
 
 
 RideOp = Literal["trim", "split", "merge", "delete", "add", "undo"]
@@ -63,6 +73,23 @@ class EditRequest(BaseModel):
 
 class ExportRequest(BaseModel):
     rides: list[str] | None = None  # default: every ride (only new or changed ones re-encode)
+    reel: bool = False  # also join the clips into one video (clips/reel.mp4)
+
+
+class AddSessionRequest(BaseModel):
+    source_path: str
+    min_length_s: float | None = None
+
+
+class RerunRequest(BaseModel):
+    min_length_s: float
+
+
+class SourceVideo(BaseModel):
+    path: str
+    name: str
+    size_bytes: int
+    session_id: str | None  # already added
 
 
 def create_app(
@@ -74,6 +101,9 @@ def create_app(
     app = FastAPI(
         title="Surf Session Clipper", docs_url="/api/docs", openapi_url="/api/openapi.json"
     )
+
+    jobs = Jobs()  # clip export (NVENC)
+    work_jobs = Jobs()  # analysis and re-runs (CUDA), one at a time
 
     @app.exception_handler(ApiError)
     async def _api_error(_: Request, exc: ApiError) -> JSONResponse:  # pyright: ignore[reportUnusedFunction]
@@ -155,9 +185,67 @@ def create_app(
                     labels_total=total,
                     labels_final=final_file.exists(),
                     exported=sum(1 for r in rides.rides if r.export) if rides else 0,
+                    analysed="track" in s.stages and s.stages["track"].status == "done",
+                    zone_confirmed=confirmed_zone(read_edits(SessionStore(root, s))) is not None,
+                    job=work_jobs.active(s.session_id, "analyse")
+                    or work_jobs.active(s.session_id, "rerun"),
                 )
             )
         return out
+
+    def source_dirs() -> list[str]:
+        return load_config(config_path).server.source_dirs
+
+    @app.get("/api/sources")
+    def get_sources() -> list[SourceVideo]:
+        """Videos in the configured source folders, and whether each is a session already."""
+        out: list[SourceVideo] = []
+        for p in list_sources(source_dirs()):
+            sid = session_id_for(p)
+            out.append(
+                SourceVideo(
+                    path=str(p),
+                    name=p.name,
+                    size_bytes=p.stat().st_size,
+                    session_id=sid if (artifacts / sid / "session.json").exists() else None,
+                )
+            )
+        return out
+
+    @app.post("/api/sessions")
+    def add_session(req: AddSessionRequest) -> dict[str, Any]:
+        """Add a video and start analysing it (or return the running job)."""
+        try:
+            source = allowed_source(Path(req.source_path), source_dirs())
+            store = SessionStore.open(source, artifacts)
+        except (SourceNotAllowedError, SourceLocationError) as exc:
+            raise ApiError(400, "source_not_allowed", str(exc)) from exc
+        sid = store.session.session_id
+        if req.min_length_s is not None:
+            if req.min_length_s <= 0:
+                raise ApiError(400, "invalid_setting", "minimum ride length must be positive")
+            store.session.config_overrides["rides.min_length_s"] = req.min_length_s
+            store.save()
+        job = work_jobs.active(sid, "analyse") or work_jobs.submit(
+            "analyse", sid, lambda report: process_session(store, config_path, report)
+        )
+        return {"session_id": sid, "job": job.model_dump(mode="json")}
+
+    @app.post("/api/sessions/{sid}/rerun")
+    def rerun(sid: str, req: RerunRequest) -> Job:
+        """Re-run ride finding with new settings; detection is cached and edits are kept."""
+        store = store_of(sid)
+        if req.min_length_s <= 0:
+            raise ApiError(400, "invalid_setting", "minimum ride length must be positive")
+        if confirmed_zone(read_edits(store)) is None:
+            raise ApiError(409, "zone_not_confirmed", "set the wave zone first")
+        running = work_jobs.active(sid, "rerun") or work_jobs.active(sid, "analyse")
+        if running is not None:
+            return running
+        overrides: dict[str, object] = {"rides.min_length_s": req.min_length_s}
+        return work_jobs.submit(
+            "rerun", sid, lambda report: rerun_rides(store, config_path, overrides, report)
+        )
 
     @app.get("/api/sessions/{sid}")
     def get_session(sid: str) -> dict[str, Any]:
@@ -252,7 +340,6 @@ def create_app(
         return FileResponse(path, media_type="video/mp4")
 
     # ---- review: edits and export -------------------------------------------------------------
-    jobs = Jobs()
     write_lock = threading.Lock()  # rides.json writers: edits and the end of an export
 
     def check_edit(req: EditRequest, rides: Rides, edits: list[UserEdit]) -> list[str]:
@@ -325,6 +412,11 @@ def create_app(
             def progress(i: int, n: int, rid: str) -> None:
                 report((i - 1) / max(n, 1), f"encoding {rid} ({i}/{n})")
 
+            if req.reel:
+                reel = export_reel(store, cfg.export, ride_ids=req.rides, progress=progress)
+                with write_lock:
+                    rebuild_rides(store)
+                return {"reel": str(reel), "folder": str(store.path("clips"))}
             done, skipped = export_rides(store, cfg.export, ride_ids=req.rides, progress=progress)
             with write_lock:
                 rebuild_rides(store)
@@ -332,9 +424,16 @@ def create_app(
 
         return jobs.submit("export", sid, work)
 
+    @app.get("/api/sessions/{sid}/media/reel.mp4")
+    def reel_video(sid: str) -> FileResponse:
+        path = folder(sid) / REEL_FILE
+        if not path.exists():
+            raise ApiError(404, "not_exported", "no reel yet: export one first")
+        return FileResponse(path, media_type="video/mp4")
+
     @app.get("/api/jobs/{job_id}")
     def get_job(job_id: str) -> Job:
-        job = jobs.get(job_id)
+        job = jobs.get(job_id) or work_jobs.get(job_id)
         if job is None:
             raise ApiError(404, "job_not_found", f"no job {job_id}")
         return job

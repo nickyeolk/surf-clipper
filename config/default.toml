@@ -104,3 +104,6 @@ thumb_every_s = 10.0
 [server]
 host = "127.0.0.1"            # loopback only (FR-025)
 port = 8765
+source_dirs = [                # folders the browser UI may add videos from (read only)
+  "/mnt/c/Users/likkhian/OneDrive/Media/trifecta",
+]
