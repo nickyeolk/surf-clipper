@@ -142,6 +142,20 @@ def rider_ride_ids(riders: Riders, rider: str) -> set[str]:
     raise ApiError(404, "rider_not_found", f"no rider {rider}")
 
 
+class _UiFiles(StaticFiles):
+    """The built UI. index.html must never be cached (it names the current hashed bundles), or a
+    browser keeps showing an old UI after an update; the hashed assets can be cached for good."""
+
+    def file_response(self, *args: Any, **kwargs: Any) -> Response:
+        response = super().file_response(*args, **kwargs)
+        path = str(args[0]) if args else ""
+        if path.endswith(".html"):
+            response.headers["Cache-Control"] = "no-cache"
+        else:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 def create_app(
     artifacts: Path,
     labels_dir: Path = Path("labels/rides"),
@@ -734,5 +748,5 @@ def create_app(
         return FileResponse(path, media_type="image/jpeg")
 
     if web_dist is not None and (web_dist / "index.html").exists():
-        app.mount("/", StaticFiles(directory=web_dist, html=True), name="web")
+        app.mount("/", _UiFiles(directory=web_dist, html=True), name="web")
     return app
