@@ -7,6 +7,7 @@ via Starlette's FileResponse) and stores label work. It contains no pipeline log
 
 from __future__ import annotations
 
+import contextlib
 import json
 import subprocess
 import threading
@@ -26,6 +27,7 @@ from surfclip.edits.rebuild import AUTO_JOINS_FILE, rebuild_rides
 from surfclip.eval.labels import LabelError, LabelWork, SessionLabels, finalize, work_from_rides
 from surfclip.eval.riders import RiderLabelWork, detected_grouping, propose_work
 from surfclip.eval.riders import finalize as finalize_riders
+from surfclip.media.compile import export_compilation, find_rider
 from surfclip.media.export import (
     export_reel,
     export_rides,
@@ -767,6 +769,11 @@ def create_app(
                     store.path(RIDERS_FILE).read_text(encoding="utf-8")
                 )
                 ids = sorted(rider_ride_ids(riders, req.rider))
+                if req.reel:  # 003: one rider's reel is the captioned compilation
+                    path = export_compilation(
+                        store, cfg.export, cfg.compilation, riders, req.rider, progress=progress
+                    )
+                    return {"reel": str(path), "folder": str(store.path("clips"))}
             if req.reel:
                 reel = export_reel(
                     store,
@@ -787,6 +794,9 @@ def create_app(
 
     @app.get("/api/sessions/{sid}/media/reel.mp4")
     def reel_video(sid: str, rider: str | None = None) -> FileResponse:
+        if rider is not None and (folder(sid) / RIDERS_FILE).exists():
+            with contextlib.suppress(KeyError):  # compilations use the rider's display name
+                rider = find_rider(read(folder(sid) / RIDERS_FILE, Riders), rider)[0]
         path = folder(sid) / reel_file(rider)
         if not path.exists():
             raise ApiError(404, "not_exported", "no reel yet: export one first")

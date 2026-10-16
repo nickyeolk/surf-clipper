@@ -126,6 +126,19 @@ class ExportConfig(_Section):
     max_bitrate_factor: float
 
 
+class CompilationConfig(_Section):
+    caption_s: float
+    font: str
+    size_frac: float
+    position: Literal["bottom_left", "bottom_right", "top_left", "top_right"]
+    margin_frac: float
+    box_opacity: float
+    level_sdr: float
+    level_hlg: float
+    level_pq: float
+    still_quality: int
+
+
 class ReviewConfig(_Section):
     height: int
     keyframe_interval_s: float
@@ -156,6 +169,7 @@ class Config(_Section):
     rides: RidesConfig
     riders: RidersConfig
     export: ExportConfig
+    compilation: CompilationConfig
     review: ReviewConfig
     server: ServerConfig
 

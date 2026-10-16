@@ -482,8 +482,11 @@
           Export {toExport > 0 ? `${toExport} clip${toExport === 1 ? '' : 's'}` : 'clips (up to date)'}
         </button>
         <button disabled={job?.status === 'running' || job?.status === 'queued' || rideList.length === 0}
-          onclick={() => exportClips(undefined, true)} title="All rides in this list joined into one video">
-          Export as one video
+          onclick={() => exportClips(undefined, true)}
+          title={riderFilter
+            ? "This rider's rides as one video, each with the rider's name, ride number and time for its first seconds"
+            : 'All rides in this list joined into one video'}>
+          {riderFilter ? 'Export compilation' : 'Export as one video'}
         </button>
       </div>
       {#if job}
@@ -491,7 +494,7 @@
           {#if job.status === 'failed'}
             <span class="error">Export failed: {job.error}</span>
           {:else if job.status === 'done' && job.result.reel}
-            One video of {rideList.length} rides →
+            {riderFilter ? 'Compilation' : 'One video'} of {rideList.length} rides →
             <a href={reelHref()} target="_blank" rel="noreferrer">open ↗</a>
             <code>{job.result.reel}</code>
           {:else if job.status === 'done'}

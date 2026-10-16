@@ -152,6 +152,23 @@
       status = (e as Error).message
     }
   }
+  // 003: a rider's compilation (captioned rides as one video), one at a time
+  let compJob = $state<{ rider: string; job: Job } | null>(null)
+  async function compile(g: { label: string }) {
+    try {
+      let job = await api.exportClips(sessionId, undefined, true, g.label)
+      compJob = { rider: g.label, job }
+      while (job.status === 'queued' || job.status === 'running') {
+        await new Promise((r) => setTimeout(r, 1000))
+        job = await api.job(job.job_id)
+        compJob = { rider: g.label, job }
+      }
+    } catch (e) {
+      status = (e as Error).message
+    }
+  }
+  const compiling = $derived(compJob?.job.status === 'queued' || compJob?.job.status === 'running')
+
   async function startOver() {
     if (!confirm('Undo every rider change in this session (names, merges, splits, moves)?')) return
     busy = true
@@ -219,6 +236,20 @@
           {/if}
         </p>
       {/if}
+      {#if compJob}
+        <p class="small">
+          {#if compJob.job.status === 'failed'}
+            <span class="error">Compilation failed: {compJob.job.error}</span>
+          {:else if compJob.job.status === 'done'}
+            Compilation of {compJob.rider} ready →
+            <a href={`#/viewer/${sessionId}`}>watch in Exports</a> ·
+            <a href={api.reelUrl(sessionId, compJob.rider)} target="_blank" rel="noreferrer">open ↗</a>
+          {:else}
+            {compJob.rider}: <progress max="1" value={compJob.job.progress}></progress>
+            {compJob.job.message || compJob.job.status}
+          {/if}
+        </p>
+      {/if}
       <details class="help small" open>
         <summary>How it works</summary>
         <p>
@@ -229,7 +260,9 @@
         <p>
           Name the riders you care about — just yourself is fine. <em>same as</em> merges two cards
           of one person; <em>mixed</em> splits a card of two people; <em>ignore</em> hides staff.
-          <em>play &amp; export</em> opens that rider's rides in Review (play all, one video).
+          <em>play &amp; export</em> opens that rider's rides in Review (play all, one video);
+          <em>compilation</em> makes one video of their rides with name, ride number and time
+          shown for the first seconds of each.
         </p>
       </details>
     </section>
@@ -334,6 +367,8 @@
               title="This card shows two different people">mixed</button>
             <button onclick={() => ignore(g, true)} disabled={busy} title="Staff, or not riding">ignore</button>
             <a class="button" href={reviewHref(g)}>play &amp; export</a>
+            <button onclick={() => compile(g)} disabled={busy || compiling}
+              title="One video of this rider's rides, each captioned with name, ride number and time">compilation</button>
           </div>
         </div>
       {/each}

@@ -329,3 +329,48 @@ class AutoJoins(_Versioned):
     output, not an edit: rides.json applies them; the user's ``rider_unjoin`` edits win."""
 
     joins: list[tuple[RideRef, RideRef]] = Field(default_factory=list[tuple[RideRef, RideRef]])
+
+
+class CaptionedSegment(_Model):
+    """One ride re-encoded with its caption for a compilation (003, research R2)."""
+
+    path: str
+    cache_key: str
+    span: tuple[float, float]
+    duration_s: float
+
+
+class CompilationRide(_Model):
+    ride_id: str
+    offset_s: float  # start of this ride in the compilation
+    duration_s: float
+    clip_start_s: float  # source time of the segment's first frame
+    caption: str
+
+
+class Compilation(_Model):
+    rider: str  # display name at export time (rider ids are not stable across recomputes)
+    path: str
+    made_at: datetime
+    rides: list[CompilationRide]
+
+
+class Compilations(_Versioned):
+    segments: dict[str, CaptionedSegment] = Field(default_factory=dict[str, CaptionedSegment])
+    compilations: dict[str, Compilation] = Field(default_factory=dict[str, Compilation])
+
+
+class Still(_Model):
+    name: str
+    path: str
+    t_s: float  # source time, on the frame grid
+    frame: int
+    ride_id: str | None = None
+    rider: str | None = None
+    width: int
+    height: int
+    saved_at: datetime
+
+
+class Stills(_Versioned):
+    stills: list[Still] = Field(default_factory=list[Still])

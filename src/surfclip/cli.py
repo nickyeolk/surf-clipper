@@ -245,7 +245,7 @@ def export(
     cpu: CpuOpt = False,
 ) -> None:
     """Export final-quality clips for new or changed rides (HDR kept)."""
-    from surfclip.media.export import export_reel, reel_file, rider_folders, rider_names
+    from surfclip.media.export import rider_folders, rider_names
     from surfclip.store.schemas import Riders
 
     store = SessionStore.open(video, artifacts)
@@ -268,8 +268,15 @@ def export(
             raise _fail(f"no rider {rider}: see `surfclip riders list`", 2)
         ids = group.ride_ids
         if reel:
-            path = export_reel(store, cfg.export, ride_ids=ids, cpu=cpu, out_name=reel_file(rider))
-            typer.echo(f"one video of {len(ids)} rides -> {path}")
+            from surfclip.media.compile import export_compilation
+
+            def step(i: int, n: int, rid: str) -> None:
+                typer.echo(f"  [{i}/{n}] {rid}", err=True)
+
+            path = export_compilation(
+                store, cfg.export, cfg.compilation, riders, rider, cpu=cpu, progress=step
+            )
+            typer.echo(f"compilation of {len(ids)} rides with captions -> {path}")
             return
 
     def progress(i: int, n: int, rid: str) -> None:

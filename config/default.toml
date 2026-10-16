@@ -4,7 +4,7 @@
 # "_px_at_720p" (a detector-input size, normalised to a 720p frame).
 # Bump config_version whenever a default changes (informational). Stage cache keys use only the
 # sections each stage reads, so changing a ride threshold never re-runs detection.
-config_version = 4
+config_version = 5
 
 [analysis]
 fps = 5                       # analysis proxy frame rate
@@ -109,6 +109,18 @@ sdr_codec = "h264_high"
 nvenc_preset = "p5"
 cq = 19                       # constant-quality target
 max_bitrate_factor = 1.5      # cap clip bitrate at this multiple of the source's
+
+[compilation]
+caption_s = 3.0               # caption shows for the first seconds of each ride, then is gone
+font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+size_frac = 0.055             # text height as a fraction of the shorter frame side
+position = "bottom_left"      # bottom_left | bottom_right | top_left | top_right
+margin_frac = 0.04            # of the shorter frame side
+box_opacity = 0.45            # black box behind the text
+level_sdr = 0.92              # caption grey level (fraction of full scale) per transfer:
+level_hlg = 0.75              # HLG reference white (BT.2408), not 1000-nit peak
+level_pq = 0.58               # PQ reference white (203 cd/m2)
+still_quality = 2             # JPEG quality for stills (ffmpeg -q:v; 2 = best)
 
 [review]
 height = 720

@@ -147,7 +147,16 @@ def clip_cache_key(info: SourceInfo, ride: Ride, cfg: ExportConfig, cpu: bool) -
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
 
 
-def export_clip(info: SourceInfo, ride: Ride, out: Path, cfg: ExportConfig, cpu: bool) -> None:
+def export_clip(
+    info: SourceInfo,
+    ride: Ride,
+    out: Path,
+    cfg: ExportConfig,
+    cpu: bool,
+    *,
+    vf: str | None = None,
+) -> None:
+    """Re-encode the ride's padded span; ``vf`` adds a filter (003's captions)."""
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_name(out.stem + ".tmp.mp4")
     cmd = [
@@ -165,6 +174,7 @@ def export_clip(info: SourceInfo, ride: Ride, out: Path, cfg: ExportConfig, cpu:
         "-map",
         "0:v:0",
         *(["-map", "0:a:0?", "-c:a", "aac", "-b:a", "160k"] if info.has_audio else []),
+        *(["-vf", vf] if vf else []),
         *_codec_args(info, cfg, cpu),
         "-movflags",
         "+faststart",
@@ -196,6 +206,13 @@ def attach_exports(rides: Rides, exports: Exports, store: SessionStore) -> Rides
     return rides.model_copy(update={"rides": out})
 
 
+def source_info(store: SessionStore) -> SourceInfo:
+    info = store.read_model("probe.json", SourceInfo)
+    if info.bit_rate is None:  # probe.json from before bit_rate was recorded; re-probing is cheap
+        info = probe(Path(info.path))
+    return info
+
+
 def export_rides(
     store: SessionStore,
     cfg: ExportConfig,
@@ -205,9 +222,7 @@ def export_rides(
     progress: Callable[[int, int, str], None] | None = None,
 ) -> tuple[list[str], list[str]]:
     """Export new or changed clips. Returns (exported ride ids, skipped up-to-date ride ids)."""
-    info = store.read_model("probe.json", SourceInfo)
-    if info.bit_rate is None:  # probe.json from before bit_rate was recorded; re-probing is cheap
-        info = probe(Path(info.path))
+    info = source_info(store)
     rides = store.read_model("rides.json", Rides)
     exports = read_exports(store)
     todo = [r for r in rides.rides if ride_ids is None or r.ride_id in ride_ids]
@@ -247,7 +262,7 @@ def reel_file(rider: str | None = None) -> str:
     """clips/reel.mp4, or clips/reel_<rider>.mp4 for one rider (name made file-safe)."""
     if not rider:
         return REEL_FILE
-    return f"clips/reel_{_slug(rider)}.mp4"
+    return f"clips/reel_{slug(rider)}.mp4"
 
 
 def export_reel(
@@ -314,7 +329,7 @@ def rider_folders(
     clips = store.path("clips")
     folders: dict[str, int] = {}
     for g in keep:
-        folder = clips / _slug(labels[g.rider_id])
+        folder = clips / slug(labels[g.rider_id])
         folder.mkdir(parents=True, exist_ok=True)
         for old in folder.glob("*.mp4"):  # the folder mirrors the rider's current rides
             old.unlink()
@@ -361,5 +376,5 @@ def rider_names(riders: Riders) -> dict[str, str]:
     return {g.rider_id: g.name or f"Rider {k}" for k, g in enumerate(riders.riders, start=1)}
 
 
-def _slug(name: str) -> str:
+def slug(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]+", "_", name).strip("_") or "rider"
