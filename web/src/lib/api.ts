@@ -158,6 +158,23 @@ export interface Job {
   error: string | null
 }
 
+export interface RiderLabelItem {
+  id: string
+  start_s: number
+  end_s: number
+  rider: string | null
+  proposed: string | null
+  detected_ride: string | null
+}
+
+export interface RiderLabelWork {
+  schema_version: string
+  source: string
+  items: RiderLabelItem[]
+  named: string[]
+  finalized: boolean
+}
+
 export class ApiError extends Error {
   constructor(public code: string, message: string) {
     super(message)
@@ -215,6 +232,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ source_path: sourcePath, min_length_s: minLength }),
     }),
+  riderLabels: (id: string) => call<RiderLabelWork>(`/sessions/${id}/rider-labels`),
+  saveRiderLabels: (id: string, work: RiderLabelWork) =>
+    call<RiderLabelWork>(`/sessions/${id}/rider-labels`, { method: 'PUT', body: JSON.stringify(work) }),
+  finalizeRiderLabels: (id: string) =>
+    call<{ rides: number; riders: number }>(`/sessions/${id}/rider-labels/finalize`, { method: 'POST' }),
+  riderStillUrl: (id: string, ride: string, t?: number) =>
+    `/api/sessions/${id}/media/rider-still.jpg?ride=${ride}${t !== undefined ? `&t=${t.toFixed(2)}` : ''}`,
   rerun: (id: string, minLength: number) =>
     call<Job>(`/sessions/${id}/rerun`, { method: 'POST', body: JSON.stringify({ min_length_s: minLength }) }),
   job: (jobId: string) => call<Job>(`/jobs/${jobId}`),

@@ -386,5 +386,36 @@ def eval_cmd(
     )
 
 
+@app.command("eval-riders")
+def eval_riders_cmd(
+    video: Path,
+    artifacts: ArtifactsOpt = Path("artifacts"),
+    labels_dir: Annotated[Path, typer.Option("--labels-dir")] = Path("labels/riders"),
+    config: ConfigOpt = DEFAULT_CONFIG_PATH,
+    as_json: JsonOpt = False,
+) -> None:
+    """Score rider grouping of the detected rides against the rider labels (002 SC-001)."""
+    from surfclip.eval.riders import RiderLabels, detected_grouping, evaluate_riders
+
+    store = SessionStore.open(video, artifacts)
+    label_file = labels_dir / f"{video.stem}.json"
+    if not label_file.exists():
+        raise _fail(f"no rider labels at {label_file}: label riders in the browser first", 2)
+    labels = RiderLabels.model_validate_json(label_file.read_text(encoding="utf-8"))
+    cfg = load_config(config, store.session.config_overrides)
+    detected, riders = detected_grouping(store, cfg)
+    m = evaluate_riders(labels, detected, riders)
+    if as_json:
+        typer.echo(json.dumps({**m.__dict__, "accuracy": m.accuracy}, indent=2))
+        return
+    typer.echo(
+        f"grouping    {m.accuracy:6.1%}  ({m.correct}/{m.labelled} rides in their rider's group)"
+        f"  target >= 85%\n"
+        f"riders      {m.true_riders} labelled, {m.groups} groups"
+        f" (cut {cfg.riders.cluster_threshold}, descriptor {cfg.riders.descriptor})\n"
+        f"not scored  {m.unmatched} labelled rides without a detected ride"
+    )
+
+
 if __name__ == "__main__":
     app()

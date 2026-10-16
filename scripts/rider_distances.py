@@ -12,7 +12,7 @@ import numpy as np
 
 from surfclip.config import load_config
 from surfclip.riders.cluster import group_rides
-from surfclip.riders.session import _load, ride_key  # pyright: ignore[reportPrivateUsage]
+from surfclip.riders.session import load_appearance, ride_key
 from surfclip.store.schemas import Rides
 from surfclip.store.session import SessionStore
 
@@ -22,7 +22,7 @@ ap.add_argument("--artifacts", type=Path, default=Path("artifacts"))
 args = ap.parse_args()
 store = SessionStore.open(args.video, args.artifacts)
 cfg = load_config(overrides=store.session.config_overrides)
-app = _load(store)
+app = load_appearance(store)
 assert app is not None
 rides = store.read_model("rides.json", Rides).rides
 vec = {

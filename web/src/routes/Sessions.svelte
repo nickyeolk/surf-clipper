@@ -122,6 +122,10 @@
                 {#if s.has_review_copy && s.rides !== null}
                   <a class="button" href={`#/review/${s.session_id}`}>Review</a>
                   <a class="button secondary" href={`#/label/${s.session_id}`}>Label</a>
+                  {#if s.labels_final}
+                    <a class="button secondary" href={`#/rider-labels/${s.session_id}`}
+                      title="Say who rode each labelled ride (for measuring rider grouping)">Label riders</a>
+                  {/if}
                 {:else}
                   <span class="muted small">not analysed</span>
                 {/if}

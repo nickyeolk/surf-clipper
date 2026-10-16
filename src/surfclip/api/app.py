@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -22,7 +22,9 @@ from surfclip.api.jobs import Job, Jobs, Report
 from surfclip.config import DEFAULT_CONFIG_PATH, load_config
 from surfclip.edits.log import append_edit, confirmed_zone, read_edits
 from surfclip.edits.rebuild import rebuild_rides
-from surfclip.eval.labels import LabelError, LabelWork, finalize, work_from_rides
+from surfclip.eval.labels import LabelError, LabelWork, SessionLabels, finalize, work_from_rides
+from surfclip.eval.riders import RiderLabelWork, detected_grouping, propose_work
+from surfclip.eval.riders import finalize as finalize_riders
 from surfclip.media.export import REEL_FILE, export_reel, export_rides, read_exports
 from surfclip.media.review import thumbnail
 from surfclip.process import (
@@ -32,6 +34,9 @@ from surfclip.process import (
     process_session,
     rerun_rides,
 )
+from surfclip.riders.session import load_appearance, ride_key
+from surfclip.riders.stills import rider_still, still_path
+from surfclip.rides.evidence import Obs
 from surfclip.store.schemas import EditTarget, Rides, Session, SourceInfo, UserEdit, Zone
 from surfclip.store.session import SessionStore, SourceLocationError, session_id_for
 from surfclip.zone.editing import confirm_zone, display_size, keyframe, rider_feet, zone_proposal
@@ -296,6 +301,94 @@ def create_app(
 
     def store_of(sid: str) -> SessionStore:
         return SessionStore(folder(sid), session_of(sid))
+
+    # ---- rider labels (002 evaluation; never change rides or rider edits) --------------------
+    rider_labels_dir = labels_dir.parent / "riders"
+    obs_cache: dict[tuple[str, int], list[Obs]] = {}
+
+    def rider_label_paths(session: Session) -> tuple[Path, Path]:
+        stem = Path(session.source_path).stem
+        return rider_labels_dir / f"{stem}.work.json", rider_labels_dir / f"{stem}.json"
+
+    @app.get("/api/sessions/{sid}/rider-labels")
+    def get_rider_labels(sid: str) -> RiderLabelWork:
+        session = session_of(sid)
+        work_file, final_file = rider_label_paths(session)
+        if work_file.exists():
+            return RiderLabelWork.model_validate_json(work_file.read_text(encoding="utf-8"))
+        _, ride_labels = work_paths(session)
+        if not ride_labels.exists():
+            raise ApiError(409, "no_ride_labels", "label the rides of this session first")
+        labels = SessionLabels.model_validate_json(ride_labels.read_text(encoding="utf-8"))
+        detected, riders = detected_grouping(
+            store_of(sid), load_config(config_path, session.config_overrides)
+        )
+        work = propose_work(labels, detected, riders, Path(session.source_path).name)
+        work.finalized = final_file.exists()
+        return work
+
+    @app.put("/api/sessions/{sid}/rider-labels")
+    def put_rider_labels(sid: str, work: RiderLabelWork) -> RiderLabelWork:
+        work_file, _ = rider_label_paths(session_of(sid))
+        work_file.parent.mkdir(parents=True, exist_ok=True)
+        work.finalized = False
+        tmp = work_file.with_suffix(".tmp")
+        tmp.write_text(work.model_dump_json(indent=2), encoding="utf-8")
+        tmp.replace(work_file)
+        return work
+
+    @app.post("/api/sessions/{sid}/rider-labels/finalize")
+    def finalize_rider_labels(sid: str) -> dict[str, Any]:
+        work = get_rider_labels(sid)
+        try:
+            labels = finalize_riders(work)
+        except LabelError as exc:
+            raise ApiError(409, "labels_incomplete", str(exc)) from exc
+        work_file, final_file = rider_label_paths(session_of(sid))
+        final_file.parent.mkdir(parents=True, exist_ok=True)
+        final_file.write_text(labels.model_dump_json(indent=2), encoding="utf-8")
+        work.finalized = True
+        work_file.write_text(work.model_dump_json(indent=2), encoding="utf-8")
+        return {"rides": len(labels.rides), "riders": len({r.rider for r in labels.rides})}
+
+    @app.get("/api/sessions/{sid}/media/rider-still.jpg")
+    def get_rider_still(sid: str, ride: str, t: float | None = None) -> Response:
+        """The ride's rider (current or detected ride) at time t, or mid-ride."""
+        from surfclip.stages import session_observations
+
+        store = store_of(sid)
+        candidates = [
+            r
+            for name in ("rides.json", "rides.detected.json")
+            if store.path(name).exists()
+            for r in store.read_model(name, Rides).rides
+            if r.ride_id == ride
+        ]
+        if not candidates:
+            raise ApiError(404, "ride_not_found", f"no ride {ride}")
+        r = candidates[0]
+        if t is None:  # the ride's sharpest crop, saved by the riders stage
+            app = load_appearance(store)
+            described = app.rides.get(ride_key(r)) if app else None
+            if described is not None and described.best_t is not None:
+                cached = still_path(store, r.ride_id, described.best_t)
+                if cached.exists():
+                    return Response(
+                        cached.read_bytes(),
+                        media_type="image/jpeg",
+                        headers={"Cache-Control": "max-age=3600"},
+                    )
+        tf = store.path("tracks.parquet")
+        key = (sid, tf.stat().st_mtime_ns if tf.exists() else 0)
+        if key not in obs_cache:
+            obs_cache.clear()  # one session at a time is plenty
+            obs_cache[key] = session_observations(store)
+        got = rider_still(
+            store, r, t if t is not None else (r.start_s + r.end_s) / 2, obs_cache[key]
+        )
+        if got is None:
+            raise ApiError(404, "no_still", f"no tracked rider in ride {ride}")
+        return Response(got[0], media_type="image/jpeg", headers={"Cache-Control": "max-age=3600"})
 
     @app.get("/api/sessions/{sid}/keyframe.jpg")
     def get_keyframe(sid: str, t: float = 600.0) -> FileResponse:

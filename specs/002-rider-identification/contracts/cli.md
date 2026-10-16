@@ -10,5 +10,5 @@ Conventions as in [001](../../001-ride-detection-clipping/contracts/cli.md): exi
 | `surfclip riders name VIDEO --ride RIDE_ID --name NAME` | name the group containing that ride |
 | `surfclip export VIDEO --rider NAME [--reel] [--per-rider] [--manifest]` | export one rider's clips or reel; all riders' folders; the manifest |
 | `surfclip labels riders propose VIDEO` / `finalize VIDEO` | create / finalize rider labels from the current groups (editing is done in the UI) |
-| `surfclip eval riders VIDEO [--json]` | SC-001 (share of rides in their true rider's group) and SC-002 (simulated corrections for named riders) |
+| `surfclip eval-riders VIDEO [--json]` | SC-001 (share of rides in their true rider's group) and SC-002 (simulated corrections for named riders) |
 | `surfclip models download` | also fetches the embedding weights if `riders.descriptor` uses them |

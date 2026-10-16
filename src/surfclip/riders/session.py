@@ -32,6 +32,7 @@ from surfclip.riders.describe import (
     hue_weight,
     ride_descriptor,
 )
+from surfclip.riders.stills import save_still
 from surfclip.rides.evidence import Obs
 from surfclip.store.schemas import (
     Ride,
@@ -77,7 +78,7 @@ class Appearance:
         return colour_distance(a, b, self.hue_weight)
 
 
-def _load(store: SessionStore) -> Appearance | None:
+def load_appearance(store: SessionStore) -> Appearance | None:
     path = store.path(APPEARANCE_FILE)
     if not path.exists():
         return None
@@ -134,7 +135,7 @@ def describe_rides(
     """Descriptors for the given rides, describing only those not cached yet."""
     from surfclip.zone.editing import display_size
 
-    cached = _load(store)
+    cached = load_appearance(store)
     todo = [r for r in rides if cached is None or ride_key(r) not in cached.rides]
     if cached is not None and not todo:
         return cached
@@ -169,6 +170,8 @@ def describe_rides(
             ride.ride_id, vectors, [c.box_height_px for c in crops], cfg.min_crops
         )
         out[ride_key(ride)] = Described(desc, crops[0].moment.t_s if crops else None)
+        if crops:  # the sharpest crop doubles as the ride's still in the UI
+            save_still(store, ride.ride_id, crops[0].moment.t_s, crops[0].image)
         crop_rows += [
             {
                 "ride_id": ride.ride_id,
