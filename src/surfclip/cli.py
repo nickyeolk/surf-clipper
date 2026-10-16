@@ -227,7 +227,7 @@ def run(
     as_json: JsonOpt = False,
 ) -> None:
     """Run the whole pipeline for VIDEO and list the rides (needs a confirmed zone)."""
-    store = _run(video, "rides", artifacts, config, cpu, timings)
+    store = _run(video, "riders", artifacts, config, cpu, timings)
     _summarise(store, as_json)
 
 

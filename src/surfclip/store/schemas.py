@@ -27,6 +27,7 @@ StageName = Literal[
     "rides",
     "refine",
     "apply_edits",
+    "riders",
     "export",
 ]
 
@@ -239,7 +240,22 @@ class EditTarget(_Model):
     ride_ids: list[str] | None = None
 
 
-EditOp = Literal["confirm_zone", "trim", "split", "merge", "delete", "add", "undo"]
+EditOp = Literal[
+    "confirm_zone",
+    "trim",
+    "split",
+    "merge",
+    "delete",
+    "add",
+    "undo",
+    # 002: rider edits, anchored to rides by span (never to group ids)
+    "rider_name",
+    "rider_same_as",
+    "rider_mixed",
+    "rider_ignore",
+    "ride_rider",
+    "rider_unjoin",
+]
 
 
 class UserEdit(_Model):
@@ -259,3 +275,46 @@ class Edits(_Versioned):
         if ids != list(range(1, len(ids) + 1)):
             raise ValueError("edit_id values must be 1..n in order (append-only log)")
         return self
+
+
+# --- riders.json (002) ----------------------------------------------------------------------
+
+
+class RiderStill(_Model):
+    ride_id: str
+    t_s: float
+
+
+class RiderGroup(_Model):
+    rider_id: str  # stable within one computation only; never stored in edits
+    name: str | None = None
+    ignored: bool = False
+    kind: Literal["rider", "lesson"] = "rider"
+    ride_ids: list[str]
+    example_ride_id: str | None = None
+    stills: list[RiderStill] = Field(default_factory=list[RiderStill])
+
+
+class RideAssignment(_Model):
+    ride_id: str
+    rider_id: str | None  # None: no rider (e.g. a hand-added ride without a person)
+    confidence: float = Field(ge=0.0, le=1.0)
+    confirmed: bool = False
+    queued: bool = False
+    low_evidence: bool = False
+
+
+class JoinSuggestion(_Model):
+    first: str
+    second: str
+    gap_s: float
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class Riders(_Versioned):
+    session_id: str
+    descriptor: Literal["colour", "embedding", "both"]
+    riders: list[RiderGroup]
+    assignments: list[RideAssignment]
+    join_suggestions: list[JoinSuggestion] = Field(default_factory=list[JoinSuggestion])
+    auto_joined: list[tuple[str, str]] = Field(default_factory=list[tuple[str, str]])

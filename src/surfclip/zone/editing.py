@@ -129,5 +129,5 @@ def confirm_zone(store: SessionStore, zone: Zone, config_path: Path = DEFAULT_CO
         {"zone": zone.model_dump(mode="json"), "how": "accepted" if accepted else "edited"},
     )
     cfg = load_config(config_path, store.session.config_overrides)
-    default_pipeline().run(store, cfg, until="rides")
+    default_pipeline().run(store, cfg, until="riders")
     return store.read_model("rides.json", Rides)

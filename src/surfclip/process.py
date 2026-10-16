@@ -19,10 +19,11 @@ Report = Callable[[float, str], None]
 # Share of total time per stage (the rest are instant).
 WEIGHTS: dict[StageName, float] = {
     "probe": 0.01,
-    "review_copy": 0.42,
-    "detect": 0.53,
+    "review_copy": 0.41,
+    "detect": 0.52,
     "track": 0.02,
-    "rides": 0.02,
+    "rides": 0.01,
+    "riders": 0.03,
 }
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".mkv"}
 LABELS: dict[StageName, str] = {
@@ -31,6 +32,7 @@ LABELS: dict[StageName, str] = {
     "detect": "finding people",
     "track": "following people between frames",
     "rides": "finding rides",
+    "riders": "telling riders apart",
 }
 
 
@@ -107,7 +109,7 @@ def process_session(store: SessionStore, config_path: Path, report: Report) -> d
             EditTarget(epoch_id=zone.epoch_id),
             {"zone": zone.model_dump(mode="json"), "how": "auto"},
         )
-    default_pipeline().run(store, cfg, until="rides", progress=progress)
+    default_pipeline().run(store, cfg, until="riders", progress=progress)
     rides = store.read_model("rides.json", Rides)
     return {
         "next": "review",
@@ -128,6 +130,6 @@ def rerun_rides(
     store.save()
     cfg = load_config(config_path, store.session.config_overrides)  # raises on bad values
     report(0.1, "finding rides")
-    default_pipeline().run(store, cfg, until="rides")
+    default_pipeline().run(store, cfg, until="riders")
     rides = store.read_model("rides.json", Rides)
     return {"rides": len(rides.rides), "short_attempts": len(rides.short_attempts)}

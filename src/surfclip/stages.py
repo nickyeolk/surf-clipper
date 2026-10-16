@@ -294,7 +294,31 @@ def source_scale(info: SourceInfo, meta: FrameMeta) -> tuple[float, float]:
     return width / meta.width, height / meta.height
 
 
+@dataclass
+class RidersStage(Stage):
+    """Group the session's rides by rider (feature 002): crops from the review copy, appearance
+    descriptors (cached per ride), constrained grouping, confidences."""
+
+    name: StageName = "riders"
+    depends_on: tuple[StageName, ...] = ("review_copy", "rides")
+    config_sections: tuple[str, ...] = ("riders", "rides")
+    code_version: str = field(default_factory=lambda: source_version("riders/*.py", "stages.py"))
+
+    def run(self, ctx: StageContext) -> list[str]:
+        from surfclip.riders.service import refresh_riders
+
+        refresh_riders(ctx.store, ctx.config, progress=ctx.progress)
+        return ["appearance.parquet", "riders.json"]
+
+
 def default_pipeline(*, cpu: bool = False) -> Pipeline:
     return Pipeline(
-        [ProbeStage(), ReviewCopyStage(cpu=cpu), DetectStage(cpu=cpu), TrackStage(), RidesStage()]
+        [
+            ProbeStage(),
+            ReviewCopyStage(cpu=cpu),
+            DetectStage(cpu=cpu),
+            TrackStage(),
+            RidesStage(),
+            RidersStage(),
+        ]
     )

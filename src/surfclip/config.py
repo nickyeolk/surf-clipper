@@ -103,6 +103,20 @@ class RidesConfig(_Section):
     changeover_overlap_max_s: float
 
 
+class RidersConfig(_Section):
+    crops_per_ride: int
+    keep_sharpest: int
+    min_crop_height_px: float
+    min_crops: int
+    descriptor: Literal["colour", "embedding", "both"]
+    cluster_threshold: float
+    queue_below: float
+    stills: int
+    join_gap_s: float
+    join_confidence: float
+    lighting_change_window_s: float
+
+
 class ExportConfig(_Section):
     encoder: Literal["auto", "nvenc", "cpu"]
     hdr_codec: str
@@ -140,6 +154,7 @@ class Config(_Section):
     epochs: EpochsConfig
     zone: ZoneConfig
     rides: RidesConfig
+    riders: RidersConfig
     export: ExportConfig
     review: ReviewConfig
     server: ServerConfig

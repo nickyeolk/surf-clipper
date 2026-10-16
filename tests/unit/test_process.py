@@ -41,7 +41,7 @@ def fake_pipeline(store: SessionStore, until_seen: list[str | None]):  # type: i
     class P:
         def run(self, _store, _cfg, *, until=None, progress=None):  # type: ignore[no-untyped-def]
             until_seen.append(until)
-            if until == "rides":
+            if until in ("rides", "riders"):
                 (store.root / "rides.json").write_text(json.dumps(EXAMPLE))
 
     return P
@@ -60,7 +60,7 @@ def test_reliable_proposal_is_used_automatically(
     if unreliable:
         assert runs == ["track"] and result["next"] == "zone" and zone is None
     else:
-        assert runs == ["track", "rides"] and result == {
+        assert runs == ["track", "riders"] and result == {
             "next": "review",
             "rides": 1,
             "zone": "proposed",
