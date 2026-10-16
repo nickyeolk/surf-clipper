@@ -33,6 +33,13 @@ class RiderRules:
     ignored: set[str] = field(default_factory=set[str])  # anchor rides of ignored groups
     mixed: list[list[str]] = field(default_factory=list[list[str]])  # rides to split in two
     not_names: list[tuple[str, str]] = field(default_factory=list[tuple[str, str]])
+    attach: dict[str, str] = field(default_factory=dict[str, str])  # ride -> ride it rides with
+    attach_name: dict[str, str] = field(default_factory=dict[str, str])  # ride -> rider name
+
+    @property
+    def placed(self) -> set[str]:
+        """Rides the user placed by hand: kept out of grouping, attached afterwards."""
+        return set(self.attach) | set(self.attach_name)
 
     def constraints(self) -> Constraints:
         cannot = list(self.cannot)
@@ -66,6 +73,28 @@ def _resolve_all(spans: dict[str, tuple[float, float]], rides: dict[str, Ride]) 
     return out
 
 
+def _name_of(group: list[str], rules: RiderRules) -> str | None:
+    """The name the user gave these rides' card (a locked ride first, then any anchor)."""
+    return next((rules.fixed[r] for r in group if r in rules.fixed), None) or next(
+        (rules.names[r] for r in group if r in rules.names), None
+    )
+
+
+def _detach(rules: RiderRules, ride: str) -> None:
+    """Drop the ride's must-links but keep the rides it linked joined to each other (a "same
+    as" links a whole card through one pivot ride)."""
+    partners = [b if a == ride else a for a, b in rules.must if ride in (a, b)]
+    rules.must = [m for m in rules.must if ride not in m]
+    rules.must += [(partners[0], x) for x in partners[1:]]
+
+
+def _rename(rules: RiderRules, old: str, new: str) -> None:
+    for table in (rules.fixed, rules.names):
+        for r, n in list(table.items()):
+            if n == old:
+                table[r] = new
+
+
 def rider_rules(edits: Edits, rides: list[Ride]) -> RiderRules:
     by_id = {r.ride_id: r for r in rides}
     undone = undone_ids(edits)
@@ -97,13 +126,20 @@ def _apply(edit: UserEdit, rides: dict[str, Ride], rules: RiderRules) -> None:
                     rules.names[r] = name
         for r in anchors:
             rules.names[r] = name
-        for r in examples:
+        # Only the card's main example is locked to the name: the other stills shown may include
+        # someone else's ride (20261012: a jlk ride among "me"'s stills, later moved to marcus,
+        # dragged marcus's whole card into "me").
+        for r in examples[:1]:
             rules.fixed[r] = name
     elif edit.op == "rider_same_as":
         a = _resolve_all(_span_map(p.get("rides")), rides)
         b = _resolve_all(_span_map(p.get("other")), rides)
         if a and b:
             rules.must += [(a[0], x) for x in a[1:] + b]
+            # One person now: keep the name of the card acted on (else the other's).
+            keep = _name_of(a, rules) or _name_of(b, rules)
+            for old in {_name_of(a, rules), _name_of(b, rules)} - {keep, None}:
+                _rename(rules, old, keep)  # type: ignore[arg-type]
     elif edit.op == "rider_mixed":
         group = _resolve_all(_span_map(p.get("rides")), rides)
         if len(group) >= 2:
@@ -123,22 +159,27 @@ def _apply(edit: UserEdit, rides: dict[str, Ride], rules: RiderRules) -> None:
         ride = resolve_ride(ref[0], ref[1], rides)
         if ride is None:
             return
-        if isinstance(p.get("name"), str) and p.get("name"):
-            rules.fixed[ride] = str(p["name"])
-        away = _ride_ref(p.get("away_from"))  # moved out of a group: apart from its old example
-        if away is not None:
-            old = resolve_ride(away[0], away[1], rides)
-            if old is not None and old != ride:
-                rules.must = [
-                    m for m in rules.must if ride not in m
-                ]  # earlier joins no longer hold
-                rules.cannot = [c for c in rules.cannot if ride not in c]
-                rules.cannot.append((ride, old))
+        # The latest answer about a ride replaces everything said about it before: its name,
+        # its joins and its "apart" rules.
+        rules.fixed.pop(ride, None)
+        rules.names.pop(ride, None)
+        rules.attach.pop(ride, None)
+        rules.attach_name.pop(ride, None)
+        _detach(rules, ride)
+        rules.cannot = [c for c in rules.cannot if ride not in c]
+        rules.not_names = [n for n in rules.not_names if n[0] != ride]
+        # A ride placed by hand is attached after grouping instead of being grouped: its own
+        # look (often a blurred or odd frame) then never pulls anyone else's card apart.
         other = _ride_ref(p.get("same_as_ride"))
-        if other is not None:
-            target = resolve_ride(other[0], other[1], rides)
-            if target is not None and target != ride:
-                rules.must.append((ride, target))
+        target = resolve_ride(other[0], other[1], rides) if other is not None else None
+        if target is not None and target != ride:
+            rules.attach[ride] = target
+        elif isinstance(p.get("name"), str) and p.get("name"):
+            rules.attach_name[ride] = str(p["name"])
+        else:
+            away = _ride_ref(p.get("away_from"))  # moved out of a group: apart from it
+            old = resolve_ride(away[0], away[1], rides) if away is not None else None
+            if old is not None and old != ride:
+                rules.cannot.append((ride, old))
         if isinstance(p.get("not_name"), str) and p.get("not_name"):
-            rules.fixed.pop(ride, None)
             rules.not_names.append((ride, str(p["not_name"])))

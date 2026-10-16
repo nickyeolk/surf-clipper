@@ -261,7 +261,8 @@ def build_riders(
         for r in rides
         if ride_key(r) in app.rides and app.usable(app.rides[ride_key(r)])
     }
-    vectors = {rid: app.vector(d) for rid, d in described.items()}
+    placed = rules.placed  # rides the user placed by hand: attached after grouping
+    vectors = {rid: app.vector(d) for rid, d in described.items() if rid not in placed}
     spans = {r.ride_id: (r.start_s, r.end_s) for r in rides}
     constraints = rules.constraints()
     must, cannot = list(constraints.must), list(constraints.cannot)
@@ -284,16 +285,45 @@ def build_riders(
     assigned = assign_confidence(groups, vectors, app.distance, low) if groups else []
 
     names = {**rules.names, **rules.fixed}  # a fixed ride names its group too
+    group_names: list[str | None] = [
+        next((rules.fixed[r] for r in g if r in rules.fixed), None)
+        or next((names[r] for r in g if r in names), None)
+        for g in groups
+    ]
+    # Attach hand-placed rides: to the card of the ride they ride with, or to the named rider
+    # (a new card when no card has that name yet).
+    groups = [list(g) for g in groups]
+    where = {r: gi for gi, g in enumerate(groups) for r in g}
+
+    def place(ride: str, seen: frozenset[str] = frozenset()) -> int:
+        if ride in where:
+            return where[ride]
+        if ride in rules.attach and ride not in seen:
+            gi = place(rules.attach[ride], seen | {ride})
+        elif ride in rules.attach_name and rules.attach_name[ride] in group_names:
+            gi = group_names.index(rules.attach_name[ride])
+        else:  # a new card (a new named rider, or a loop of placements)
+            groups.append([])
+            group_names.append(rules.attach_name.get(ride))
+            gi = len(groups) - 1
+        groups[gi].append(ride)
+        where[ride] = gi
+        return gi
+
+    for ride in sorted((r for r in placed if r in spans), key=lambda r: spans[r][0]):
+        place(ride)
+    for g in groups:
+        g.sort(key=lambda r: spans[r][0])
+
     riders: list[RiderGroup] = []
     named_groups: set[int] = set()
     for gi, group in enumerate(groups):
-        name = next((rules.fixed[r] for r in group if r in rules.fixed), None) or next(
-            (names[r] for r in group if r in names), None
-        )
+        name = group_names[gi]
         ignored = any(r in rules.ignored for r in group)
         if name is not None and not ignored:
             named_groups.add(gi)
-        by_clarity = sorted(group, key=lambda r: described[r].desc.clarity, reverse=True)
+        seen = [r for r in group if r in described]
+        by_clarity = sorted(seen, key=lambda r: described[r].desc.clarity, reverse=True)
         stills = [
             RiderStill(ride_id=r, t_s=t)
             for r in by_clarity[: cfg.stills]
@@ -305,11 +335,11 @@ def build_riders(
                 name=name,
                 ignored=ignored,
                 ride_ids=group,
-                example_ride_id=by_clarity[0],
+                example_ride_id=by_clarity[0] if by_clarity else group[0],
                 stills=stills,
             )
         )
-    fixed = set(rules.fixed)
+    fixed = set(rules.fixed) | placed
     queued = set(queue(assigned, named_groups, cfg.queue_below, fixed))
     assignments = [
         RideAssignment(
@@ -322,10 +352,17 @@ def build_riders(
         )
         for a in assigned
     ]
+    assignments += [  # placed by the user: certain
+        RideAssignment(
+            ride_id=r, rider_id=riders[where[r]].rider_id, confidence=1.0, confirmed=True
+        )
+        for r in sorted(placed)
+        if r in where
+    ]
     assignments += [  # no usable crops of a person: no rider until the user says so
         RideAssignment(ride_id=r.ride_id, rider_id=None, confidence=0.0, low_evidence=True)
         for r in rides
-        if r.ride_id not in described
+        if r.ride_id not in described and r.ride_id not in where
     ]
     return Riders(
         session_id=session_id, descriptor=app.mode, riders=riders, assignments=assignments

@@ -136,3 +136,39 @@ def test_mixed_after_same_as_splits_again() -> None:
     riders = build(RIDES, mixed)
     assert group(riders, "r0")[1] == ["r0", "r3", "r6"]
     assert group(riders, "r1")[1] == ["r1", "r4", "r7"]
+
+
+def test_moving_a_locked_example_does_not_merge_two_named_riders() -> None:
+    """20261012: one of "me"'s stills was someone else; moving it to marcus's card must not drag
+    marcus into "me"."""
+    edits = log(
+        ("rider_name", {"name": "me", "rides": spans(0, 3, 6), "examples": spans(0, 3)}),
+        ("rider_name", {"name": "marcus", "rides": spans(1, 4, 7), "examples": spans(1)}),
+        ("ride_rider", {"ride": ["r3", 300.0, 330.0], "same_as_ride": ["r1", 100.0, 130.0],
+                        "away_from": ["r0", 0.0, 30.0]}),
+    )  # fmt: skip
+    riders = build(RIDES, edits)
+    assert group(riders, "r1") == ("marcus", ["r1", "r3", "r4", "r7"], False)
+    assert group(riders, "r0") == ("me", ["r0", "r6"], False)
+
+
+def test_same_as_between_named_riders_keeps_one_name() -> None:
+    edits = log(
+        ("rider_name", {"name": "me", "rides": spans(0, 3, 6), "examples": spans(0)}),
+        ("rider_name", {"name": "lik", "rides": spans(1, 4, 7), "examples": spans(1)}),
+        ("rider_same_as", {"rides": spans(0, 3, 6), "other": spans(1, 4, 7)}),
+    )
+    riders = build(RIDES, edits)
+    assert group(riders, "r4")[0] == "me" and "r4" in group(riders, "r0")[1]
+    assert all(g.name != "lik" for g in riders.riders)
+
+
+def test_moving_the_pivot_of_a_merge_keeps_the_rest_together() -> None:
+    edits = log(
+        ("rider_same_as", {"rides": spans(0, 3, 6), "other": spans(1, 4, 7)}),
+        ("ride_rider", {"ride": ["r0", 0.0, 30.0], "same_as_ride": ["r2", 200.0, 230.0],
+                        "away_from": ["r3", 300.0, 330.0]}),
+    )  # fmt: skip
+    riders = build(RIDES, edits)
+    assert group(riders, "r3")[1] == ["r1", "r3", "r4", "r6", "r7"]
+    assert "r0" in group(riders, "r2")[1]
