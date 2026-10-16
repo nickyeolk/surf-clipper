@@ -92,9 +92,9 @@ crops_per_ride = 12           # moments sampled per ride (crops of the ride's tr
 keep_sharpest = 8             # ...of which the sharpest are kept
 min_crop_height_px = 48       # in review-copy pixels; smaller crops carry too little detail
 min_crops = 3                 # fewer usable crops: low evidence, confidence capped
-descriptor = "colour"         # colour | embedding | both (decided by the T014 spike)
-cluster_threshold = 0.15      # grouping cut (colour distance); too many groups beats mixed ones
-                              # (20240924: 0.15 -> 17 groups, 0.25 -> 3); tune on rider labels
+descriptor = "embedding"      # colour | embedding | both; T014 spike: embedding (DINOv2 ViT-S/14)
+cluster_threshold = 0.075     # grouping cut (cosine distance of embeddings); T014: best on the
+                              # four tuning sessions (PXL held out)
 queue_below = 0.5             # rides less confident than this go to the review queue
 stills = 6                    # stills shown per rider
 join_gap_s = 6.0              # join rides split at a frame edge when the gap is at most this

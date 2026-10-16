@@ -56,7 +56,7 @@ is built and the descriptor spike (T014) is decided on real labels. US1 is the M
 
 **Checkpoint**: the user labels the five evaluation sessions (about 15 min each) while US1 is built.
 
-- [ ] T014 Spike (R2): add the DINOv2 ViT-S/14 embedding as `descriptor = "embedding"` / `"both"` in src/surfclip/riders/describe.py (weights fetched by `surfclip models download`, never during processing); measure SC-001 and the riders-stage time for `colour`, `embedding`, `both` on every labelled session except PXL; adopt a non-colour option only if it beats colour on every session within SC-006; record results in specs/002-rider-identification/research.md under "T014 results" and set `riders.descriptor`; tune `cluster_threshold` on the same sessions only
+- [x] T014 Spike (R2): add the DINOv2 ViT-S/14 embedding as `descriptor = "embedding"` / `"both"` in src/surfclip/riders/describe.py (weights fetched by `surfclip models download`, never during processing); measure SC-001 and the riders-stage time for `colour`, `embedding`, `both` on every labelled session except PXL; adopt a non-colour option only if it beats colour on every session within SC-006; record results in specs/002-rider-identification/research.md under "T014 results" and set `riders.descriptor`; tune `cluster_threshold` on the same sessions only
 
 ---
 

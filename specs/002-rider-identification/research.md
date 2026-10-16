@@ -138,3 +138,25 @@ the first implementation task (measured on the rider labels) before anything is 
   manifest.
 - **Rationale**: re-uses 001's clip cache and one-video join; no re-encoding per rider.
 - **Alternatives**: re-encoding per rider (slow, duplicate files).
+
+## T014 results (2026-10-16)
+
+Rider labels: every labelled ride of the five sessions (4-9 riders each). Descriptors computed
+from the same 8 sharpest crops per ride; the cut-off was swept on the four tuning sessions
+(PXL_20261014_100546073 held out), picking the best worst-session score.
+
+| Descriptor | Same / different rider median distance | SC-001 mean (tuning) | Worst tuning session | PXL (held out) |
+| --- | --- | --- | --- | --- |
+| colour (cut 0.14) | separation 1.14-1.60x | 48.8% | 38.6% (night HDR) | 75.3% |
+| **embedding (cut 0.075)** | separation 1.53-2.07x | **82.8%** | 58.0% (night HDR) | **92.2%** |
+| both (calibrated, cut 0.80) | separation 1.21-1.66x | 68.5% | 53.2% | 79.2% |
+
+Per session with the embedding: 20240924 79.7%, 20241004 93.3%, 20260928_IMG_1652 100%,
+20261012_110549566 58.0%, PXL 92.2%. Describing a 1 h session with embeddings takes 19-42 s on
+the RTX 2060 (SC-006: ≤ 5 min).
+
+**Decision**: `riders.descriptor = "embedding"`, `riders.cluster_threshold = 0.075`. The pretrained
+embedding beats the colour baseline on every session (constitution VIII). Colour adds nothing
+when mixed in. The night HDR session over-splits (3 riders → 9 groups), which "same as" merges
+fix; SC-001 counts over-splitting as errors. Not tuned further on these sessions to avoid
+over-fitting; the user's merges and queue answers (US1/US2) are the intended remedy.

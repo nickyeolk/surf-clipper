@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 import cv2
 import numpy as np
@@ -116,3 +118,65 @@ def ride_descriptor(
         len(crops) < min_crops,
         float(np.median(heights)),
     )
+
+
+# --- pretrained embedding (research R2 option 2) --------------------------------------------
+
+EMBED_H, EMBED_W = 224, 112  # crops are resized to this (multiples of the 14 px ViT patch)
+_MEAN = np.array([0.485, 0.456, 0.406])
+_STD = np.array([0.229, 0.224, 0.225])
+
+
+def download_embedder() -> Path:
+    """Fetch DINOv2 ViT-S/14 code and weights into the torch hub cache (network, once)."""
+    import torch
+
+    hub_api: Any = torch.hub
+    hub_api.load("facebookresearch/dinov2", "dinov2_vits14", trust_repo=True)
+    return Path(torch.hub.get_dir()) / "facebookresearch_dinov2_main"
+
+
+class Embedder:
+    """DINOv2 ViT-S/14 image embeddings of person crops, loaded from the local torch hub cache
+    only (fetched once by `surfclip models download`; never downloaded while processing)."""
+
+    def __init__(self, cpu: bool = False) -> None:
+        import torch
+
+        hub = Path(torch.hub.get_dir()) / "facebookresearch_dinov2_main"
+        if not hub.is_dir():
+            raise RuntimeError(
+                "DINOv2 weights are not downloaded: run `surfclip models download` once"
+            )
+        self.torch: Any = torch
+        self.device = "cuda" if torch.cuda.is_available() and not cpu else "cpu"
+        hub_api: Any = torch.hub
+        model: Any = hub_api.load(str(hub), "dinov2_vits14", source="local")
+        self.model = model.to(self.device).eval()
+
+    def embed(self, crops: Sequence[Image], gains: FloatArray, batch: int = 64) -> FloatArray:
+        """One L2-normalised vector per crop (colour corrected like the colour descriptor)."""
+        if not crops:
+            return np.zeros((0, 384))
+        out: list[FloatArray] = []
+        for i in range(0, len(crops), batch):
+            imgs: list[FloatArray] = []
+            for crop in crops[i : i + batch]:
+                fixed = np.clip(crop.astype(np.float64) * gains, 0, 255).astype(np.uint8)
+                rgb = cv2.cvtColor(cv2.resize(fixed, (EMBED_W, EMBED_H)), cv2.COLOR_BGR2RGB)
+                pixels = np.asarray(rgb, dtype=np.float64) / 255.0
+                imgs.append((pixels - _MEAN) / _STD)
+            x = self.torch.tensor(np.array(imgs), dtype=self.torch.float32).permute(0, 3, 1, 2)
+            with self.torch.no_grad():
+                feats: FloatArray = np.asarray(
+                    self.model(x.to(self.device)).cpu().numpy(), dtype=np.float64
+                )
+            out.append(feats / np.maximum(np.linalg.norm(feats, axis=1, keepdims=True), 1e-9))
+        return np.concatenate(out)
+
+
+def cosine_distance(a: FloatArray, b: FloatArray) -> float:
+    na, nb = float(np.linalg.norm(a)), float(np.linalg.norm(b))
+    if na == 0 or nb == 0:
+        return 1.0
+    return 1.0 - float(a @ b) / (na * nb)

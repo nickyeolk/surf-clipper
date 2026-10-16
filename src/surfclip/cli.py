@@ -289,11 +289,15 @@ app.add_typer(models_app, name="models")
 
 @models_app.command("download")
 def models_download(config: ConfigOpt = DEFAULT_CONFIG_PATH) -> None:
-    """Download the detector weights once (the tool's only network access)."""
+    """Download the model weights once (the tool's only network access)."""
     from surfclip.detect.detector import download_model
+    from surfclip.riders.describe import download_embedder
 
-    path = download_model(load_config(config).detect)
+    cfg = load_config(config)
+    path = download_model(cfg.detect)
     typer.echo(f"detector weights at {path}")
+    if cfg.riders.descriptor != "colour":
+        typer.echo(f"rider embedding model at {download_embedder()}")
 
 
 labels_app = typer.Typer(no_args_is_help=True, help="Propose and import hand labels.")

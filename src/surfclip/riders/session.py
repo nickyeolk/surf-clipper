@@ -13,7 +13,7 @@ import json
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pyarrow as _pyarrow  # pyright: ignore[reportMissingTypeStubs]
@@ -25,9 +25,12 @@ from surfclip.riders.assign import assign_confidence, queue
 from surfclip.riders.cluster import Constraints, group_rides
 from surfclip.riders.crops import read_frames, ride_crops, ride_moments
 from surfclip.riders.describe import (
+    DESC_LEN,
+    Embedder,
     RideDescriptor,
     colour_descriptor,
     colour_distance,
+    cosine_distance,
     grey_world_gains,
     hue_weight,
     ride_descriptor,
@@ -59,26 +62,57 @@ def ride_key(ride: Ride) -> str:
     return f"{ride.start_s:.3f}-{ride.end_s:.3f}:{tracks}"
 
 
+Mode = Literal["colour", "embedding", "both"]
+# Typical distances between different riders' rides, to put both descriptors on one scale
+# (T014: medians of pairwise ride distances on the labelled sessions).
+COLOUR_SCALE = 0.16
+EMBED_SCALE = 0.10
+
+
 @dataclass(frozen=True)
 class Described:
     desc: RideDescriptor
     best_t: float | None  # time of the sharpest crop (for stills)
+    embedding: FloatArray | None = None  # mean of L2-normalised crop embeddings
 
 
 @dataclass(frozen=True)
 class Appearance:
     gains: FloatArray
     rides: dict[str, Described]  # by ride_key
+    mode: Mode = "colour"
 
     @property
     def hue_weight(self) -> float:
         return hue_weight(self.gains)
 
+    def usable(self, d: Described) -> bool:
+        return d.desc.crops > 0 and (self.mode == "colour" or d.embedding is not None)
+
+    def vector(self, d: Described) -> FloatArray:
+        if self.mode == "colour":
+            return d.desc.vector
+        assert d.embedding is not None
+        if self.mode == "embedding":
+            return d.embedding
+        return np.concatenate([d.desc.vector, d.embedding])
+
     def distance(self, a: FloatArray, b: FloatArray) -> float:
-        return colour_distance(a, b, self.hue_weight)
+        if self.mode == "colour":
+            return colour_distance(a, b, self.hue_weight)
+        if self.mode == "embedding":
+            return cosine_distance(a, b)
+        n = DESC_LEN
+        return 0.5 * (
+            colour_distance(a[:n], b[:n], self.hue_weight) / COLOUR_SCALE
+            + cosine_distance(a[n:], b[n:]) / EMBED_SCALE
+        )
+
+    def with_mode(self, mode: Mode) -> Appearance:
+        return Appearance(self.gains, self.rides, mode)
 
 
-def load_appearance(store: SessionStore) -> Appearance | None:
+def load_appearance(store: SessionStore, mode: Mode = "colour") -> Appearance | None:
     path = store.path(APPEARANCE_FILE)
     if not path.exists():
         return None
@@ -99,8 +133,9 @@ def load_appearance(store: SessionStore) -> Appearance | None:
                 float(r["box_height_px"]),
             ),
             r["t_s"],
+            None if r["embedding"] is None else np.array(r["embedding"], dtype=np.float64),
         )
-    return Appearance(gains, rides)
+    return Appearance(gains, rides, mode)
 
 
 def _save(store: SessionStore, app: Appearance, crop_rows: list[dict[str, Any]]) -> None:
@@ -116,7 +151,7 @@ def _save(store: SessionStore, app: Appearance, crop_rows: list[dict[str, Any]])
             "crops": d.desc.crops,
             "low_evidence": d.desc.low_evidence,
             "colour": d.desc.vector.tolist(),
-            "embedding": None,
+            "embedding": None if d.embedding is None else d.embedding.tolist(),
         }
         for key, d in app.rides.items()
     ]
@@ -135,10 +170,19 @@ def describe_rides(
     """Descriptors for the given rides, describing only those not cached yet."""
     from surfclip.zone.editing import display_size
 
-    cached = load_appearance(store)
-    todo = [r for r in rides if cached is None or ride_key(r) not in cached.rides]
+    mode: Mode = cfg.descriptor
+    need_embedding = mode != "colour"
+    cached = load_appearance(store, mode)
+    todo = [
+        r
+        for r in rides
+        if cached is None
+        or ride_key(r) not in cached.rides
+        or (need_embedding and cached.rides[ride_key(r)].embedding is None)
+    ]
     if cached is not None and not todo:
         return cached
+    embedder = Embedder() if need_embedding else None
     info = store.read_model("probe.json", SourceInfo)
     review = store.path("review.mp4")
     by_track: dict[int, list[Obs]] = defaultdict(list)
@@ -169,7 +213,9 @@ def describe_rides(
         desc = ride_descriptor(
             ride.ride_id, vectors, [c.box_height_px for c in crops], cfg.min_crops
         )
-        out[ride_key(ride)] = Described(desc, crops[0].moment.t_s if crops else None)
+        embeds = embedder.embed([c.image for c in crops], gains) if embedder else None
+        mean_embed = None if embeds is None or not len(embeds) else np.asarray(embeds.mean(axis=0))
+        out[ride_key(ride)] = Described(desc, crops[0].moment.t_s if crops else None, mean_embed)
         if crops:  # the sharpest crop doubles as the ride's still in the UI
             save_still(store, ride.ride_id, crops[0].moment.t_s, crops[0].image)
         crop_rows += [
@@ -184,11 +230,11 @@ def describe_rides(
                 "crops": None,
                 "low_evidence": None,
                 "colour": v.tolist(),
-                "embedding": None,
+                "embedding": None if embeds is None else embeds[k].tolist(),
             }
-            for c, v in zip(crops, vectors, strict=True)
+            for k, (c, v) in enumerate(zip(crops, vectors, strict=True))
         ]
-    app = Appearance(gains, out)
+    app = Appearance(gains, out, mode)
     _save(store, app, crop_rows)
     return app
 
@@ -215,9 +261,9 @@ def build_riders(
     described = {
         r.ride_id: app.rides[ride_key(r)]
         for r in rides
-        if ride_key(r) in app.rides and app.rides[ride_key(r)].desc.crops > 0
+        if ride_key(r) in app.rides and app.usable(app.rides[ride_key(r)])
     }
-    vectors = {rid: d.desc.vector for rid, d in described.items()}
+    vectors = {rid: app.vector(d) for rid, d in described.items()}
     spans = {r.ride_id: (r.start_s, r.end_s) for r in rides}
     groups = group_rides(
         vectors, spans, app.distance,
@@ -279,5 +325,5 @@ def build_riders(
         if r.ride_id not in described
     ]
     return Riders(
-        session_id=session_id, descriptor="colour", riders=riders, assignments=assignments
+        session_id=session_id, descriptor=app.mode, riders=riders, assignments=assignments
     )
