@@ -11,8 +11,10 @@ import contextlib
 import json
 import subprocess
 import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -27,7 +29,13 @@ from surfclip.edits.rebuild import AUTO_JOINS_FILE, rebuild_rides
 from surfclip.eval.labels import LabelError, LabelWork, SessionLabels, finalize, work_from_rides
 from surfclip.eval.riders import RiderLabelWork, detected_grouping, propose_work
 from surfclip.eval.riders import finalize as finalize_riders
-from surfclip.media.compile import export_compilation, find_rider
+from surfclip.health import Health, health
+from surfclip.media.compile import (
+    compilation_current,
+    export_compilation,
+    find_rider,
+    read_compilations,
+)
 from surfclip.media.export import (
     export_reel,
     export_rides,
@@ -37,6 +45,7 @@ from surfclip.media.export import (
     rider_names,
 )
 from surfclip.media.review import thumbnail
+from surfclip.media.stills import StillError, delete_still, read_stills, save_still
 from surfclip.process import (
     SourceNotAllowedError,
     allowed_source,
@@ -51,11 +60,13 @@ from surfclip.rides.evidence import Obs
 from surfclip.store.schemas import (
     AutoJoins,
     EditTarget,
+    Ride,
     RiderGroup,
     Riders,
     Rides,
     Session,
     SourceInfo,
+    Still,
     UserEdit,
     Zone,
 )
@@ -132,6 +143,10 @@ class RiderEditRequest(BaseModel):
     ignore: bool = True
 
 
+class StillRequest(BaseModel):
+    t_s: float  # source time (the review player's time, or a clip's start + its time)
+
+
 class AddSessionRequest(BaseModel):
     source_path: str
     min_length_s: float | None = None
@@ -181,6 +196,7 @@ def create_app(
     labels_dir: Path = Path("labels/rides"),
     web_dist: Path | None = None,
     config_path: Path = DEFAULT_CONFIG_PATH,
+    on_shutdown: Callable[[], None] | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="Surf Session Clipper", docs_url="/api/docs", openapi_url="/api/openapi.json"
@@ -828,6 +844,144 @@ def create_app(
             raise ApiError(500, "thumb_failed", "could not extract a still") from exc
         return FileResponse(path, media_type="image/jpeg")
 
+    # ---- 003: stills and the exports viewer --------------------------------------------------
+    def still_json(sid: str, s: Still) -> dict[str, object]:
+        return {**s.model_dump(mode="json"), "url": f"/api/sessions/{sid}/media/stills/{s.name}"}
+
+    @app.post("/api/sessions/{sid}/stills")
+    def post_still(sid: str, req: StillRequest, response: Response) -> dict[str, object]:
+        store = store_of(sid)
+        cfg = load_config(config_path, store.session.config_overrides)
+        try:
+            still, created = save_still(store, cfg.compilation, req.t_s)
+        except StillError as exc:
+            raise ApiError(400, "outside_video", str(exc)) from exc
+        response.status_code = 201 if created else 200
+        return still_json(sid, still)
+
+    @app.get("/api/sessions/{sid}/media/stills/{name}")
+    def still_image(sid: str, name: str, download: bool = False) -> FileResponse:
+        store = store_of(sid)
+        still = next((s for s in read_stills(store).stills if s.name == name), None)
+        if still is None or not store.path(still.path).exists():
+            raise ApiError(404, "still_not_found", f"no still {name}")
+        return FileResponse(
+            store.path(still.path),
+            media_type="image/jpeg",
+            filename=name if download else None,
+            content_disposition_type="attachment" if download else "inline",
+        )
+
+    @app.delete("/api/sessions/{sid}/stills/{name}", status_code=204)
+    def remove_still(sid: str, name: str) -> Response:
+        try:
+            found = delete_still(store_of(sid), name)
+        except StillError as exc:
+            raise ApiError(400, "bad_name", str(exc)) from exc
+        if not found:
+            raise ApiError(404, "still_not_found", f"no still {name}")
+        return Response(status_code=204)
+
+    @app.get("/api/sessions/{sid}/exports")
+    def get_exports(sid: str) -> dict[str, object]:
+        """What the viewer lists: compilations, exported clips per rider, stills."""
+        store = store_of(sid)
+        cfg = load_config(config_path, store.session.config_overrides)
+        info = read(folder(sid) / "probe.json", SourceInfo)
+        rides = read(folder(sid) / "rides.json", Rides)
+        riders: Riders | None = (
+            read(folder(sid) / RIDERS_FILE, Riders)
+            if (folder(sid) / RIDERS_FILE).exists()
+            else None
+        )
+
+        def clip(r: Ride) -> dict[str, object]:
+            return {
+                "ride_id": r.ride_id,
+                "url": f"/api/sessions/{sid}/media/clips/{r.ride_id}.mp4",
+                "clip_start_s": r.clip_start_s,
+                "duration_s": round(r.clip_end_s - r.clip_start_s, 3),
+            }
+
+        exported = sorted((r for r in rides.rides if r.export), key=lambda r: r.start_s)
+        groups: list[dict[str, object]] = []
+        placed: set[str] = set()
+        if riders is not None:
+            labels = rider_labels(riders)
+            for g in riders.riders:
+                ids = set(g.ride_ids)
+                placed |= ids
+                clips = [clip(r) for r in exported if r.ride_id in ids]
+                if clips and not g.ignored:
+                    groups.append({"rider": labels[g.rider_id], "clips": clips})
+        comps: list[dict[str, object]] = []
+        for label, comp in read_compilations(store).compilations.items():
+            if not store.path(comp.path).exists():
+                continue
+            current = riders is not None and compilation_current(
+                store, cfg.export, cfg.compilation, riders, label
+            )
+            comps.append(
+                {
+                    **comp.model_dump(mode="json", exclude={"path"}),
+                    "url": f"/api/sessions/{sid}/media/reel.mp4?rider={quote(label)}",
+                    "current": current,
+                }
+            )
+        return {
+            "fps": info.avg_fps,
+            "compilations": comps,
+            "riders": groups,
+            "unassigned": [clip(r) for r in exported if r.ride_id not in placed],
+            "stills": [still_json(sid, s) for s in read_stills(store).stills],
+        }
+
+    # ---- 003: start and stop without a terminal (research R5, R6) ---------------------------
+    @app.get("/api/health")
+    def get_health() -> Health:
+        return health(load_config(config_path))
+
+    @app.post("/api/models/download")
+    def post_models_download() -> Job:
+        if work_jobs.active("-", "models") is not None:
+            raise ApiError(409, "already_running", "the models are already downloading")
+
+        def work(report: Report) -> dict[str, object]:
+            from surfclip.detect.detector import download_model
+            from surfclip.riders.describe import download_embedder
+
+            cfg = load_config(config_path)
+            report(0.05, "downloading the detector")
+            out: dict[str, object] = {"detector": str(download_model(cfg.detect))}
+            if cfg.riders.descriptor != "colour":
+                report(0.5, "downloading the rider model")
+                out["embedder"] = str(download_embedder())
+            return out
+
+        return work_jobs.submit("models", "-", work)
+
+    @app.post("/api/shutdown")
+    def post_shutdown() -> dict[str, bool]:
+        jobs.shutdown()
+        work_jobs.shutdown()
+        threading.Thread(target=on_shutdown or exit_process, daemon=True).start()
+        return {"stopping": True}
+
     if web_dist is not None and (web_dist / "index.html").exists():
         app.mount("/", _UiFiles(directory=web_dist, html=True), name="web")
     return app
+
+
+def exit_process(grace_s: float = 3.0) -> None:
+    """Stop child processes (ffmpeg), ask uvicorn to stop, and exit after a grace period even
+    if an analysis thread is still busy. Outputs are written to temporary files and renamed, so
+    nothing half-written is left; the next start resumes from the cache."""
+    import os
+    import signal
+    import time
+
+    time.sleep(0.3)  # let the response go out
+    subprocess.run(["pkill", "-TERM", "-P", str(os.getpid())], check=False, capture_output=True)
+    os.kill(os.getpid(), signal.SIGINT)
+    time.sleep(grace_s)
+    os._exit(0)

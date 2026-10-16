@@ -292,16 +292,56 @@ def export(
 
 
 @app.command()
+def still(
+    video: Path,
+    at: Annotated[str, typer.Option("--at", help="Source time: seconds or m:ss(.f).")],
+    artifacts: ArtifactsOpt = Path("artifacts"),
+    config: ConfigOpt = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Save the frame at a time as a full-resolution JPEG (HDR tone-mapped)."""
+    from surfclip.eval.labels import LabelError, parse_time
+    from surfclip.media.stills import StillError, save_still
+
+    store = SessionStore.open(video, artifacts)
+    if not store.path("probe.json").exists():
+        raise _fail("not analysed yet: run `surfclip run` first", 2)
+    try:
+        t = float(at) if ":" not in at else parse_time(at)
+    except (ValueError, LabelError) as exc:
+        raise _fail(f"cannot read the time {at!r}", 2) from exc
+    cfg = load_config(config, store.session.config_overrides)
+    try:
+        saved, _ = save_still(store, cfg.compilation, t)
+    except StillError as exc:
+        raise _fail(str(exc), 1) from exc
+    typer.echo(f"frame {saved.frame} ({saved.width}x{saved.height}) -> {store.path(saved.path)}")
+
+
+@app.command()
 def serve(
     artifacts: ArtifactsOpt = Path("artifacts"),
     config: ConfigOpt = DEFAULT_CONFIG_PATH,
     labels_dir: Annotated[Path, typer.Option("--labels-dir")] = Path("labels/rides"),
+    log: Annotated[
+        Path | None, typer.Option("--log", help="Write server output to this file (hidden start).")
+    ] = None,
 ) -> None:
     """Start the local backend and browser UI (loopback only)."""
     import uvicorn
 
     from surfclip.api.app import create_app
 
+    if log is not None:  # started without a console (scripts/windows/start.ps1)
+        import logging
+        import os
+
+        log.parent.mkdir(parents=True, exist_ok=True)
+        out = log.open("a", encoding="utf-8", buffering=1)
+        os.dup2(out.fileno(), 1)
+        os.dup2(out.fileno(), 2)
+        logging.basicConfig(
+            level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+        )
     cfg = load_config(config)
     web_dist = Path(__file__).resolve().parents[2] / "web" / "dist"
     if not (web_dist / "index.html").exists():

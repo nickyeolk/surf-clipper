@@ -80,3 +80,11 @@ class Jobs:
 
         self._pool.submit(run)
         return job.model_copy()
+
+    def shutdown(self) -> None:
+        """Drop queued jobs; the running one is stopped with the process (003 R5)."""
+        self._pool.shutdown(wait=False, cancel_futures=True)
+        with self._lock:
+            for job in self._jobs.values():
+                if job.status == "queued":
+                    job.status, job.error = "failed", "stopped"

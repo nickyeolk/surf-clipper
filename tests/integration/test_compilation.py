@@ -6,6 +6,7 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from surfclip.config import load_config
@@ -133,3 +134,52 @@ def test_segments_cached_and_recaptioned_on_rename(tmp_path: Path) -> None:
     export_compilation(store, CFG.export, CFG.compilation, _riders("jo"), "jo", cpu=True)
     assert seg.stat().st_mtime_ns != first
     assert store.path("clips/reel_jo.mp4").exists()
+
+
+def _frame(src: Path, n: int, hdr: bool) -> np.ndarray:
+    """Frame n of the source (decoded from the start, no seeking), as the still would show it."""
+    from surfclip.media.review import TONEMAP
+
+    vf = [
+        *([TONEMAP] if hdr else []),
+        f"select=eq(n\\,{n})",
+        "scale=in_color_matrix=auto,format=rgb24",
+    ]
+    raw = subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", str(src), "-vf", ",".join(vf), "-frames:v", "1",
+         "-f", "rawvideo", "-"],
+        capture_output=True, check=True,
+    ).stdout  # fmt: skip
+    return np.frombuffer(raw, np.uint8).reshape(360, 640, 3).astype(np.float32)
+
+
+@pytest.mark.parametrize("hdr", [False, True], ids=["sdr", "hlg"])
+def test_still_is_the_exact_source_frame(tmp_path: Path, hdr: bool) -> None:
+    from PIL import Image
+
+    from surfclip.media.stills import read_stills, save_still
+
+    src = tmp_path / "footage" / "src.mp4"
+    src.parent.mkdir(parents=True)
+    tags = (
+        ["-pix_fmt", "yuv420p10le", "-c:v", "libx265", "-x265-params", "log-level=error",
+         "-color_primaries", "bt2020", "-color_trc", "arib-std-b67", "-colorspace", "bt2020nc"]
+        if hdr
+        else ["-pix_fmt", "yuv420p", "-c:v", "libx264"]
+    )  # fmt: skip
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30",
+         "-t", "20", "-preset", "ultrafast", "-g", "60", *tags, str(src)],
+        check=True,
+    )  # fmt: skip
+    store = _store(tmp_path, src)
+    still, created = save_still(store, CFG.compilation, 12.34)  # frame 370, inside ride r000300
+    assert created and (still.frame, still.ride_id) == (370, "r000300")
+    assert (still.width, still.height) == (640, 360)
+    img = np.asarray(Image.open(store.path(still.path)).convert("RGB"), np.float32)
+    errors = {n: float(np.abs(img - _frame(src, n, hdr)).mean()) for n in (369, 370, 371)}
+    assert min(errors, key=lambda n: errors[n]) == 370
+    assert errors[370] < 4.0  # JPEG and chroma subsampling only
+    again, created = save_still(store, CFG.compilation, 12.335)
+    assert not created and again.name == still.name == "r000300_f000370.jpg"
+    assert len(read_stills(store).stills) == 1

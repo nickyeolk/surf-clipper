@@ -235,6 +235,57 @@ export interface RiderEditRequest {
   ignore?: boolean
 }
 
+// ---- 003: health, exports viewer, stills ----------------------------------------------------
+export interface Health {
+  ok: boolean
+  version: string
+  gpu: boolean
+  encoder: 'nvenc' | 'cpu'
+  models: { detector: boolean; embedder: boolean }
+}
+
+export interface CompilationRide {
+  ride_id: string
+  offset_s: number
+  duration_s: number
+  clip_start_s: number
+  caption: string
+}
+
+export interface CompilationInfo {
+  rider: string
+  url: string
+  current: boolean
+  made_at: string
+  rides: CompilationRide[]
+}
+
+export interface ClipInfo {
+  ride_id: string
+  url: string
+  clip_start_s: number
+  duration_s: number
+}
+
+export interface StillInfo {
+  name: string
+  url: string
+  t_s: number
+  frame: number
+  ride_id: string | null
+  rider: string | null
+  width: number
+  height: number
+}
+
+export interface ExportsInfo {
+  fps: number
+  compilations: CompilationInfo[]
+  riders: { rider: string; clips: ClipInfo[] }[]
+  unassigned: ClipInfo[]
+  stills: StillInfo[]
+}
+
 export class ApiError extends Error {
   constructor(public code: string, message: string) {
     super(message)
@@ -323,6 +374,14 @@ export const api = {
   job: (jobId: string) => call<Job>(`/jobs/${jobId}`),
   thumbUrl: (id: string, t: number) => `/api/sessions/${id}/media/thumb.jpg?t=${(Math.round(t * 2) / 2).toFixed(1)}`,
   clipUrl: (id: string, rideId: string) => `/api/sessions/${id}/media/clips/${rideId}.mp4`,
+  health: () => call<Health>('/health'),
+  downloadModels: () => call<Job>('/models/download', { method: 'POST' }),
+  shutdown: () => call<{ stopping: boolean }>('/shutdown', { method: 'POST' }),
+  exports: (id: string) => call<ExportsInfo>(`/sessions/${id}/exports`),
+  saveStill: (id: string, t: number) =>
+    call<StillInfo>(`/sessions/${id}/stills`, { method: 'POST', body: JSON.stringify({ t_s: t }) }),
+  deleteStill: (id: string, name: string) =>
+    fetch(`/api/sessions/${id}/stills/${encodeURIComponent(name)}`, { method: 'DELETE' }),
 }
 
 export function clock(seconds: number): string {

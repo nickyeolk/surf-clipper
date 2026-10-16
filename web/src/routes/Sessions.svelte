@@ -1,7 +1,7 @@
 <script lang="ts">
   // Sessions: add a video from the footage folder, follow its processing, then go to the next
   // step (zone, then review). Polls while anything is processing.
-  import { api, clock, type SessionSummary, type SourceVideo } from '../lib/api'
+  import { api, clock, type Health, type Job, type SessionSummary, type SourceVideo } from '../lib/api'
 
   let sessions = $state<SessionSummary[] | null>(null)
   let sources = $state<SourceVideo[]>([])
@@ -10,6 +10,35 @@
   let minLength = $state(10)
   let adding = $state(false)
   let addError = $state('')
+
+  // 003: what the start needs to tell the user (GPU, models), and stopping without a terminal
+  let health = $state<Health | null>(null)
+  let modelJob = $state<Job | null>(null)
+  let stopped = $state(false)
+  $effect(() => {
+    api.health().then((h) => (health = h)).catch(() => {})
+  })
+  async function downloadModels() {
+    try {
+      modelJob = await api.downloadModels()
+      while (modelJob.status === 'queued' || modelJob.status === 'running') {
+        await new Promise((r) => setTimeout(r, 1500))
+        modelJob = await api.job(modelJob.job_id)
+      }
+      health = await api.health()
+    } catch (e) {
+      addError = (e as Error).message
+    }
+  }
+  async function stop() {
+    const busy = sessions?.some((s) => s.job && (s.job.status === 'queued' || s.job.status === 'running'))
+    const ask = busy
+      ? 'Stop Surf Clipper? Work in progress stops and continues from where it got to next time.'
+      : 'Stop Surf Clipper?'
+    if (!confirm(ask)) return
+    await api.shutdown().catch(() => {})
+    stopped = true
+  }
 
   async function load() {
     try {
@@ -45,9 +74,36 @@
   }
 </script>
 
-<h1>Sessions</h1>
+<div class="title">
+  <h1>Sessions</h1>
+  {#if !stopped}<button class="stop" onclick={stop} title="Stop the tool (start it again from the desktop shortcut)">Stop</button>{/if}
+</div>
 
-{#if error}
+{#if stopped}
+  <p class="banner">Surf Clipper is stopped. Start it again with the <strong>Surf Clipper</strong> shortcut on the Desktop; you can close this tab.</p>
+{:else if health && (!health.gpu || !health.models.detector || !health.models.embedder)}
+  <div class="banner">
+    {#if !health.gpu}
+      <p>No NVIDIA GPU found: everything works, but analysis and exports will be much slower.</p>
+    {/if}
+    {#if !health.models.detector || !health.models.embedder}
+      <p>
+        The {[!health.models.detector && 'person detector', !health.models.embedder && 'rider model'].filter(Boolean).join(' and ')}
+        {!health.models.detector && !health.models.embedder ? 'are' : 'is'} not downloaded yet (needed once, about 100 MB).
+        {#if modelJob && (modelJob.status === 'queued' || modelJob.status === 'running')}
+          <progress max="1" value={modelJob.progress}></progress> {modelJob.message}
+        {:else}
+          <button class="primary" onclick={downloadModels}>Download models</button>
+          {#if modelJob?.status === 'failed'}<span class="error small">failed: {modelJob.error}</span>{/if}
+        {/if}
+      </p>
+    {/if}
+  </div>
+{/if}
+
+{#if stopped}
+  <!-- nothing more to show -->
+{:else if error}
   <p class="error">Could not load sessions: {error}</p>
 {:else if sessions === null}
   <p class="muted">Loading…</p>
@@ -122,6 +178,10 @@
                 {#if s.has_review_copy && s.rides !== null}
                   <a class="button" href={`#/review/${s.session_id}`}>Review</a>
                   <a class="button" href={`#/riders/${s.session_id}`}>Riders</a>
+                  {#if s.exported > 0}
+                    <a class="button secondary" href={`#/viewer/${s.session_id}`}
+                      title="Watch exported clips and compilations at full quality; saved stills">Exports</a>
+                  {/if}
                   <a class="button secondary" href={`#/label/${s.session_id}`}>Label</a>
                   {#if s.labels_final}
                     <a class="button secondary" href={`#/rider-labels/${s.session_id}`}
@@ -140,6 +200,28 @@
 {/if}
 
 <style>
+  .title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1000px;
+  }
+  .stop {
+    background: var(--panel);
+    border-color: var(--border);
+  }
+  .banner {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--q);
+    border-radius: 8px;
+    padding: 6px 12px;
+    margin-bottom: 16px;
+    max-width: 1000px;
+  }
+  .banner p {
+    margin: 4px 0;
+  }
   .add {
     display: flex;
     flex-wrap: wrap;

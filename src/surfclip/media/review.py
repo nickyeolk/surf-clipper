@@ -15,7 +15,7 @@ from surfclip.config import ReviewConfig
 from surfclip.media.decode import output_size
 from surfclip.store.schemas import SourceInfo
 
-_TONEMAP = (
+TONEMAP = (
     "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
     "tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p"
 )
@@ -23,7 +23,7 @@ _TONEMAP = (
 
 def review_command(info: SourceInfo, out: Path, cfg: ReviewConfig, *, cpu: bool) -> list[str]:
     width, height = output_size(info, cfg.height)
-    filters = [_TONEMAP] if info.hdr_format != "none" else []
+    filters = [TONEMAP] if info.hdr_format != "none" else []
     filters.append(f"scale={width}:{height}:flags=area,format=yuv420p")
     gop = max(1, round(info.avg_fps * cfg.keyframe_interval_s))
     # Bitrate capped: uncapped constant quality with a 0.5 s keyframe interval gave 2.2 GB per hour.
