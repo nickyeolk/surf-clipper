@@ -95,8 +95,8 @@ frame at full resolution.
 ### User Story 4 - Start the tool without a developer (Priority: P1)
 
 The user starts the tool from Windows with one action, the browser opens on the Sessions page,
-and processing works as today (GPU used when present). Updates and model downloads do not need
-a terminal.
+and processing works as today (GPU used when present). Model downloads do not need a terminal
+(updating the tool itself stays a developer step).
 
 **Why this priority**: today every start requires running commands in WSL; the tool is not
 usable on its own without that.
