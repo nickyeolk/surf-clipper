@@ -3,7 +3,7 @@
   // care about (e.g. just yourself), open a card to see all its rides and move single rides,
   // merge cards that are one person, split mixed ones, ignore staff. Every action is an edit the
   // server keeps; regrouping never loses it.
-  import { api, clock, type Ride, type RiderEditRequest, type RiderGroup, type RidersInfo, type UserEdit } from '../lib/api'
+  import { api, clock, type Job, type Ride, type RiderEditRequest, type RiderGroup, type RidersInfo, type UserEdit } from '../lib/api'
 
   let { sessionId }: { sessionId: string } = $props()
 
@@ -129,6 +129,18 @@
       busy = false
     }
   }
+  let exportJob = $state<Job | null>(null)
+  async function exportAll() {
+    try {
+      exportJob = await api.exportRiderFolders(sessionId)
+      while (exportJob && (exportJob.status === 'queued' || exportJob.status === 'running')) {
+        await new Promise((r) => setTimeout(r, 1000))
+        exportJob = await api.job(exportJob.job_id)
+      }
+    } catch (e) {
+      status = (e as Error).message
+    }
+  }
   async function startOver() {
     if (!confirm('Undo every rider change in this session (names, merges, splits, moves)?')) return
     busy = true
@@ -178,6 +190,24 @@
         <button onclick={startOver} disabled={!undoable || busy}>start over</button>
         <a class="button secondary" href={`#/review/${sessionId}`}>Review all rides</a>
       </div>
+      <div class="row">
+        <button onclick={exportAll} disabled={busy || exportJob?.status === 'running' || exportJob?.status === 'queued'}
+          title="A folder of full-quality clips per rider (ignored riders left out), plus a list of every ride">
+          Export all riders
+        </button>
+      </div>
+      {#if exportJob}
+        <p class="small">
+          {#if exportJob.status === 'failed'}
+            <span class="error">Export failed: {exportJob.error}</span>
+          {:else if exportJob.status === 'done'}
+            Folders: {Object.entries(exportJob.result.folders ?? {}).map(([n, k]) => `${n} (${k})`).join(', ')}
+            → <code>{exportJob.result.folder}</code>; list: <code>{exportJob.result.manifest}</code>
+          {:else}
+            <progress max="1" value={exportJob.progress}></progress> {exportJob.message || exportJob.status}
+          {/if}
+        </p>
+      {/if}
       <details class="help small" open>
         <summary>How it works</summary>
         <p>

@@ -12,9 +12,13 @@ encoder settings) changed; records live in exports.json so pipeline re-runs keep
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import json
 import logging
+import os
 import re
+import shutil
 import subprocess
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -24,7 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from surfclip.config import ExportConfig
 from surfclip.media.probe import probe
-from surfclip.store.schemas import ExportRecord, Ride, Rides, SourceInfo
+from surfclip.store.schemas import ExportRecord, Ride, Riders, Rides, SourceInfo
 from surfclip.store.session import SessionStore
 
 log = logging.getLogger(__name__)
@@ -243,8 +247,7 @@ def reel_file(rider: str | None = None) -> str:
     """clips/reel.mp4, or clips/reel_<rider>.mp4 for one rider (name made file-safe)."""
     if not rider:
         return REEL_FILE
-    slug = re.sub(r"[^A-Za-z0-9_-]+", "_", rider).strip("_") or "rider"
-    return f"clips/reel_{slug}.mp4"
+    return f"clips/reel_{_slug(rider)}.mp4"
 
 
 def export_reel(
@@ -285,3 +288,78 @@ def export_reel(
         raise RuntimeError(f"joining clips failed: {result.stderr.strip()[-500:]}")
     tmp.replace(out)
     return out
+
+
+def rider_folders(
+    store: SessionStore,
+    cfg: ExportConfig,
+    riders: Riders,
+    *,
+    cpu: bool = False,
+    progress: Callable[[int, int, str], None] | None = None,
+) -> dict[str, object]:
+    """Per-rider folders of clips and the session manifest (002 FR-008).
+
+    Every ride of a rider (ignored riders left out) is exported once to clips/<ride>.mp4 as
+    usual, then linked (hard link, else copied) into clips/<rider>/. The manifest lists every
+    ride with its rider, confidence and clip, as clips/manifest.json and clips/manifest.csv.
+    """
+    labels = rider_names(riders)
+    keep = [g for g in riders.riders if not g.ignored]
+    wanted = sorted({r for g in keep for r in g.ride_ids})
+    if wanted:
+        export_rides(store, cfg, ride_ids=wanted, cpu=cpu, progress=progress)
+    rides = store.read_model("rides.json", Rides)
+    by_id = {r.ride_id: r for r in rides.rides}
+    clips = store.path("clips")
+    folders: dict[str, int] = {}
+    for g in keep:
+        folder = clips / _slug(labels[g.rider_id])
+        folder.mkdir(parents=True, exist_ok=True)
+        for old in folder.glob("*.mp4"):  # the folder mirrors the rider's current rides
+            old.unlink()
+        for rid in g.ride_ids:
+            rec = by_id[rid].export if rid in by_id else None
+            if rec is None:
+                continue
+            src, dst = store.path(rec.path), folder / f"{rid}.mp4"
+            try:
+                os.link(src, dst)
+            except OSError:
+                shutil.copy2(src, dst)
+        folders[labels[g.rider_id]] = len(g.ride_ids)
+    assignment = {a.ride_id: a for a in riders.assignments}
+    rider_of = {r: g for g in riders.riders for r in g.ride_ids}
+    rows: list[dict[str, object]] = []
+    for r in rides.rides:
+        a, g = assignment.get(r.ride_id), rider_of.get(r.ride_id)
+        rows.append(
+            {
+                "ride_id": r.ride_id,
+                "start_s": round(r.start_s, 3),
+                "end_s": round(r.end_s, 3),
+                "rider": "unassigned"
+                if g is None
+                else "ignored"
+                if g.ignored
+                else labels[g.rider_id],
+                "confidence": a.confidence if a else None,
+                "confirmed": a.confirmed if a else False,
+                "clip": r.export.path if r.export else "",
+            }
+        )
+    (clips / "manifest.json").write_text(json.dumps(rows, indent=2), encoding="utf-8")
+    with (clips / "manifest.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0]) if rows else ["ride_id"])
+        writer.writeheader()
+        writer.writerows(rows)
+    return {"folders": folders, "manifest": str(clips / "manifest.csv")}
+
+
+def rider_names(riders: Riders) -> dict[str, str]:
+    """Display name per rider id: the user's name, else "Rider N" (largest card first)."""
+    return {g.rider_id: g.name or f"Rider {k}" for k, g in enumerate(riders.riders, start=1)}
+
+
+def _slug(name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_-]+", "_", name).strip("_") or "rider"

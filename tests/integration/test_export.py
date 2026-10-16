@@ -165,3 +165,73 @@ def test_reel_joins_clips_in_order(tmp_path: Path) -> None:
         "r000360.mp4",
         "reel.mp4",
     }
+
+
+def test_rider_folders_and_manifest(tmp_path: Path) -> None:
+    """002 T031: a folder per rider (links to the clips, no re-encode) and the manifest."""
+    import csv as _csv
+    from datetime import UTC, datetime
+
+    from surfclip.media.export import rider_folders
+    from surfclip.store.schemas import (
+        RideAssignment,
+        RiderGroup,
+        Riders,
+        Rides,
+        Session,
+        SourceSummary,
+    )
+    from surfclip.store.session import SessionStore
+
+    src = tmp_path / "footage" / "src.mp4"
+    src.parent.mkdir()
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30",
+         "-t", "20", "-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", "ultrafast", str(src)],
+        check=True,
+    )  # fmt: skip
+    info = probe(src)
+    root = tmp_path / "artifacts" / "s1"
+    root.mkdir(parents=True)
+    store = SessionStore(
+        root,
+        Session(session_id="s1", source_path=str(src), source_size=1, source_mtime=0,
+                created_at=datetime(2026, 10, 16, tzinfo=UTC)),
+    )  # fmt: skip
+    store.write_model("probe.json", info)
+    a = _ride(2.0, 4.0, info.avg_fps)
+    b = _ride(8.0, 10.0, info.avg_fps).model_copy(update={"ride_id": "r000240"})
+    c = _ride(14.0, 16.0, info.avg_fps).model_copy(update={"ride_id": "r000420"})
+    store.write_model(
+        "rides.json",
+        Rides(
+            session_id="s1",
+            source=SourceSummary(path=str(src), fps=info.avg_fps, hdr_format="none"),
+            settings={"min_length_s": 1, "pad_before_s": 1.0, "pad_after_s": 1.5},  # type: ignore[arg-type]
+            rides=[a, b, c],
+        ),
+    )
+    riders = Riders(
+        session_id="s1",
+        descriptor="embedding",
+        riders=[
+            RiderGroup(rider_id="g01", name="me", ride_ids=["r000001", "r000420"]),
+            RiderGroup(rider_id="g02", ride_ids=["r000240"], ignored=True),
+        ],
+        assignments=[RideAssignment(ride_id="r000001", rider_id="g01", confidence=1.0,
+                                    confirmed=True)],
+    )  # fmt: skip
+    out = rider_folders(store, CFG, riders, cpu=True)
+    assert out["folders"] == {"me": 2}
+    assert sorted(p.name for p in (root / "clips" / "me").iterdir()) == [
+        "r000001.mp4",
+        "r000420.mp4",
+    ]
+    assert not (root / "clips" / "Rider_2").exists()  # ignored
+    rows = list(_csv.DictReader((root / "clips" / "manifest.csv").open(encoding="utf-8")))
+    assert [(r["ride_id"], r["rider"]) for r in rows] == [
+        ("r000001", "me"),
+        ("r000240", "ignored"),
+        ("r000420", "me"),
+    ]
+    assert rows[0]["clip"] == "clips/r000001.mp4" and rows[1]["clip"] == ""

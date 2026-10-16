@@ -235,16 +235,42 @@ def run(
 def export(
     video: Path,
     rides: Annotated[str, typer.Option("--rides", help="Comma-separated ride ids.")] = "",
+    rider: Annotated[str, typer.Option("--rider", help="Only this rider's rides.")] = "",
+    reel: Annotated[bool, typer.Option("--reel", help="Also join them into one video.")] = False,
+    per_rider: Annotated[
+        bool, typer.Option("--per-rider", help="A folder per rider and the ride list (CSV/JSON).")
+    ] = False,
     artifacts: ArtifactsOpt = Path("artifacts"),
     config: ConfigOpt = DEFAULT_CONFIG_PATH,
     cpu: CpuOpt = False,
 ) -> None:
     """Export final-quality clips for new or changed rides (HDR kept)."""
+    from surfclip.media.export import export_reel, reel_file, rider_folders, rider_names
+    from surfclip.store.schemas import Riders
+
     store = SessionStore.open(video, artifacts)
     if not store.path("rides.json").exists():
         raise _fail("no rides yet: run `surfclip run` first", 2)
     cfg = load_config(config, store.session.config_overrides)
     ids = [r.strip() for r in rides.split(",") if r.strip()] or None
+    if rider or per_rider:
+        if not store.path("riders.json").exists():
+            raise _fail("no riders yet: run `surfclip run` first", 2)
+        riders = store.read_model("riders.json", Riders)
+        if per_rider:
+            out = rider_folders(store, cfg.export, riders, cpu=cpu)
+            typer.echo(f"rider folders {out['folders']} -> {store.path('clips')}")
+            typer.echo(f"ride list {out['manifest']}")
+            return
+        names = rider_names(riders)
+        group = next((g for g in riders.riders if rider in (g.name, names[g.rider_id])), None)
+        if group is None:
+            raise _fail(f"no rider {rider}: see `surfclip riders list`", 2)
+        ids = group.ride_ids
+        if reel:
+            path = export_reel(store, cfg.export, ride_ids=ids, cpu=cpu, out_name=reel_file(rider))
+            typer.echo(f"one video of {len(ids)} rides -> {path}")
+            return
 
     def progress(i: int, n: int, rid: str) -> None:
         typer.echo(f"  [{i}/{n}] {rid}", err=True)

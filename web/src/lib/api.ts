@@ -160,7 +160,17 @@ export interface Job {
   status: 'queued' | 'running' | 'done' | 'failed'
   progress: number
   message: string
-  result: { exported?: string[]; up_to_date?: string[]; folder?: string; reel?: string; next?: string; rides?: number; short_attempts?: number }
+  result: {
+    exported?: string[]
+    up_to_date?: string[]
+    folder?: string
+    reel?: string
+    next?: string
+    rides?: number
+    short_attempts?: number
+    folders?: Record<string, number>
+    manifest?: string
+  }
   error: string | null
 }
 
@@ -264,6 +274,8 @@ export const api = {
   rides: (id: string, rider?: string) =>
     call<Rides>(`/sessions/${id}/rides${rider ? `?rider=${encodeURIComponent(rider)}` : ''}`),
   riders: (id: string) => call<RidersInfo>(`/sessions/${id}/riders`),
+  exportRiderFolders: (id: string) =>
+    call<Job>(`/sessions/${id}/export`, { method: 'POST', body: JSON.stringify({ per_rider: true }) }),
   joinRides: (id: string, first: string, second: string) =>
     call<{ riders: RiderGroup[] }>(`/sessions/${id}/joins`, { method: 'POST', body: JSON.stringify({ first, second }) }),
   unjoinRide: (id: string, rideId: string) =>

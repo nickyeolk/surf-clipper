@@ -118,8 +118,8 @@ session (SC-002 ≤ 10)
 
 **Independent Test**: export a session with three riders and check folders and manifest
 
-- [ ] T031 [P] [US4] Integration test in tests/integration/test_export.py: per-rider folders (hard links or copies of existing clips, no re-encode), ignored riders absent, manifest JSON/CSV rows for every ride with rider, confidence, confirmed and clip path
-- [ ] T032 [US4] Implement `per_rider` and `manifest` export in src/surfclip/media/export.py, the export route and `surfclip export --rider/--per-rider/--manifest` in src/surfclip/cli.py (R10); export buttons in web/src/routes/Riders.svelte
+- [x] T031 [P] [US4] Integration test in tests/integration/test_export.py: per-rider folders (hard links or copies of existing clips, no re-encode), ignored riders absent, manifest JSON/CSV rows for every ride with rider, confidence, confirmed and clip path
+- [x] T032 [US4] Implement `per_rider` and `manifest` export in src/surfclip/media/export.py, the export route and `surfclip export --rider/--per-rider/--manifest` in src/surfclip/cli.py (R10); export buttons in web/src/routes/Riders.svelte
 
 ---
 

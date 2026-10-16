@@ -26,7 +26,14 @@ from surfclip.edits.rebuild import AUTO_JOINS_FILE, rebuild_rides
 from surfclip.eval.labels import LabelError, LabelWork, SessionLabels, finalize, work_from_rides
 from surfclip.eval.riders import RiderLabelWork, detected_grouping, propose_work
 from surfclip.eval.riders import finalize as finalize_riders
-from surfclip.media.export import export_reel, export_rides, read_exports, reel_file
+from surfclip.media.export import (
+    export_reel,
+    export_rides,
+    read_exports,
+    reel_file,
+    rider_folders,
+    rider_names,
+)
 from surfclip.media.review import thumbnail
 from surfclip.process import (
     SourceNotAllowedError,
@@ -93,6 +100,7 @@ class ExportRequest(BaseModel):
     rides: list[str] | None = None  # default: every ride (only new or changed ones re-encode)
     reel: bool = False  # also join the clips into one video (clips/reel.mp4)
     rider: str | None = None  # only this rider's rides (name or rider id); reel_<rider>.mp4
+    per_rider: bool = False  # folders of clips per rider + the session manifest (JSON, CSV)
 
 
 class JoinRequest(BaseModel):
@@ -139,8 +147,8 @@ class SourceVideo(BaseModel):
 
 
 def rider_labels(riders: Riders) -> dict[str, str]:
-    """Display name per rider id: the user's name, else "Rider N" (largest group first)."""
-    return {g.rider_id: g.name or f"Rider {k}" for k, g in enumerate(riders.riders, start=1)}
+    """Display name per rider id (the same names the export folders use)."""
+    return rider_names(riders)
 
 
 def rider_ride_ids(riders: Riders, rider: str) -> set[str]:
@@ -745,6 +753,14 @@ def create_app(
             def progress(i: int, n: int, rid: str) -> None:
                 report((i - 1) / max(n, 1), f"encoding {rid} ({i}/{n})")
 
+            if req.per_rider:
+                riders = Riders.model_validate_json(
+                    store.path(RIDERS_FILE).read_text(encoding="utf-8")
+                )
+                out = rider_folders(store, cfg.export, riders, progress=progress)
+                with write_lock:
+                    rebuild_rides(store)
+                return {**out, "folder": str(store.path("clips"))}
             ids = req.rides
             if req.rider is not None:
                 riders = Riders.model_validate_json(
