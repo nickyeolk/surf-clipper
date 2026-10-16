@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import subprocess
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -238,6 +239,14 @@ def export_rides(
 REEL_FILE = "clips/reel.mp4"
 
 
+def reel_file(rider: str | None = None) -> str:
+    """clips/reel.mp4, or clips/reel_<rider>.mp4 for one rider (name made file-safe)."""
+    if not rider:
+        return REEL_FILE
+    slug = re.sub(r"[^A-Za-z0-9_-]+", "_", rider).strip("_") or "rider"
+    return f"clips/reel_{slug}.mp4"
+
+
 def export_reel(
     store: SessionStore,
     cfg: ExportConfig,
@@ -245,6 +254,7 @@ def export_reel(
     ride_ids: list[str] | None = None,
     cpu: bool = False,
     progress: Callable[[int, int, str], None] | None = None,
+    out_name: str = REEL_FILE,
 ) -> Path:
     """All (or the given) rides as one video, in time order: the per-ride clips (exported first
     when new or changed) joined without re-encoding. They share codec settings, so the concat
@@ -257,13 +267,13 @@ def export_reel(
     )
     if not chosen:
         raise RuntimeError("no rides to put in the reel")
-    out = store.path(REEL_FILE)
-    listing = out.with_name("reel.txt")
+    out = store.path(out_name)
+    listing = out.with_name(out.stem + ".txt")
     listing.write_text(
         "".join(f"file '{Path(r.export.path).name}'\n" for r in chosen if r.export),
         encoding="utf-8",
     )
-    tmp = out.with_name("reel.tmp.mp4")
+    tmp = out.with_name(out.stem + ".tmp.mp4")
     result = subprocess.run(
         ["ffmpeg", "-v", "error", "-nostdin", "-y", "-f", "concat", "-safe", "0",
          "-i", str(listing), "-c", "copy", "-movflags", "+faststart", str(tmp)],

@@ -4,6 +4,7 @@
   import Zone from './routes/Zone.svelte'
   import Review from './routes/Review.svelte'
   import RiderLabels from './routes/RiderLabels.svelte'
+  import Riders from './routes/Riders.svelte'
 
   let hash = $state(location.hash)
   $effect(() => {
@@ -27,9 +28,13 @@
     {#key route[1]}
       <RiderLabels sessionId={route[1]} />
     {/key}
-  {:else if route[0] === 'review' && route[1]}
+  {:else if route[0] === 'riders' && route[1]}
     {#key route[1]}
-      <Review sessionId={route[1]} />
+      <Riders sessionId={route[1]} />
+    {/key}
+  {:else if route[0] === 'review' && route[1]}
+    {#key route.join('/')}
+      <Review sessionId={route[1]} rider={route[2] === 'rider' && route[3] ? decodeURIComponent(route[3]) : undefined} />
     {/key}
   {:else if route[0] === 'zone' && route[1]}
     {#key route[1]}

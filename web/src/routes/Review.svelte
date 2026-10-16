@@ -8,7 +8,11 @@
   } from '../lib/api'
   import Timeline, { type Bar } from '../lib/Timeline.svelte'
 
-  let { sessionId }: { sessionId: string } = $props()
+  let { sessionId, rider }: { sessionId: string; rider?: string } = $props()
+  // Rider filter (002): only this rider's rides in the list, play-all and export.
+  // svelte-ignore state_referenced_locally (initial value; the route re-creates the page)
+  let riderFilter = $state(rider ?? '')
+  let riderLabels = $state<string[]>([])
 
   type Item =
     | { kind: 'ride'; id: string; start_s: number; end_s: number; ride: Ride }
@@ -46,8 +50,10 @@
     Promise.all([
       api.rides(sessionId), api.session(sessionId), api.activity(sessionId).catch(() => null),
       api.edits(sessionId),
+      api.riders(sessionId).catch(() => null),
     ])
-      .then(([r, s, a, e]) => {
+      .then(([r, s, a, e, rd]) => {
+        riderLabels = rd ? rd.riders.filter((g) => !g.ignored).map((g) => g.label) : []
         rides = r
         probe = s.probe
         zoneOrigin = s.zone_origin
@@ -61,7 +67,13 @@
 
   const duration = $derived(probe?.duration_s ?? 1)
   const frame = $derived(1 / (probe?.avg_fps ?? 30))
-  const rideList = $derived(rides ? [...rides.rides].sort((a, b) => a.start_s - b.start_s) : [])
+  const rideList = $derived(
+    rides
+      ? [...rides.rides]
+          .filter((r) => !riderFilter || r.rider === riderFilter)
+          .sort((a, b) => a.start_s - b.start_s)
+      : [],
+  )
   // Short attempts the user already kept as a ride are not shown again.
   const shorts = $derived(
     rides
@@ -239,7 +251,7 @@
     try {
       const before = selected
       const res = await api.edit(sessionId, op, target, payload)
-      rides = res.rides
+      rides = riderLabels.length ? await api.rides(sessionId) : res.rides // keep rider fields
       edits = [...edits, res.edit]
       if (nextId) selectedId = nextId(res.rides)
       if (before && !res.rides.rides.some((r) => r.ride_id === selectedId)) {
@@ -307,9 +319,14 @@
   }
 
   // ---- export -------------------------------------------------------------------------------
+  function reelHref(): string {
+    const url = api.reelUrl(sessionId, riderFilter || undefined)
+    return `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`
+  }
   async function exportClips(ids?: string[], asReel = false) {
+    const who = riderFilter || undefined
     try {
-      job = await api.exportClips(sessionId, ids, asReel)
+      job = await api.exportClips(sessionId, ids, asReel, ids ? undefined : who)
       while (job && (job.status === 'queued' || job.status === 'running')) {
         await new Promise((r) => setTimeout(r, 1000))
         job = await api.job(job.job_id)
@@ -445,6 +462,17 @@
     </section>
 
     <aside class="rides">
+      {#if riderLabels.length}
+        <div class="row">
+          <label>Rider
+            <select class="num wide" bind:value={riderFilter} onchange={() => (reel = false)}>
+              <option value="">all riders</option>
+              {#each riderLabels as l}<option value={l}>{l}</option>{/each}
+            </select>
+          </label>
+          <a class="small" href={`#/riders/${sessionId}`}>name riders</a>
+        </div>
+      {/if}
       <div class="progress">
         <span><strong>{rideList.length}</strong> rides · {exported} exported</span>
       </div>
@@ -464,7 +492,7 @@
             <span class="error">Export failed: {job.error}</span>
           {:else if job.status === 'done' && job.result.reel}
             One video of {rideList.length} rides →
-            <a href={`${api.reelUrl(sessionId)}?t=${Date.now()}`} target="_blank" rel="noreferrer">open ↗</a>
+            <a href={reelHref()} target="_blank" rel="noreferrer">open ↗</a>
             <code>{job.result.reel}</code>
           {:else if job.status === 'done'}
             Exported {job.result.exported?.length ?? 0}, {job.result.up_to_date?.length ?? 0} already up to
@@ -613,6 +641,9 @@
     bottom: -2px;
     width: 2px;
     background: #ff7b72;
+  }
+  .num.wide {
+    width: auto;
   }
   .num {
     width: 4em;

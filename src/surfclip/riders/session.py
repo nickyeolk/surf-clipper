@@ -35,6 +35,7 @@ from surfclip.riders.describe import (
     hue_weight,
     ride_descriptor,
 )
+from surfclip.riders.edits import RiderRules
 from surfclip.riders.stills import save_still
 from surfclip.rides.evidence import Obs
 from surfclip.store.schemas import (
@@ -246,18 +247,15 @@ def build_riders(
     cfg: RidersConfig,
     *,
     overlap_allowed_s: float,
-    constraints: Constraints | None = None,
-    names: dict[str, str] | None = None,  # ride id -> name: a group holding it takes the name
-    ignored: set[str] | None = None,  # ride ids: a group holding one is ignored
+    rules: RiderRules | None = None,
 ) -> Riders:
-    """Group the rides and assign confidences (pure: no files)."""
-    names = names or {}
-    ignored = ignored or set()
-    fixed = set((constraints or Constraints()).fixed)
-    # Lesson-flagged rides are grouped like any other: 001's lesson flag also fires when someone
-    # stands in the pool during an ordinary ride (20240924: 24 of 79 rides), so it cannot decide
-    # who rode. A merged group lesson still lands in some rider's group, tagged "lesson".
-    lesson: list[Ride] = []
+    """Group the rides under the user's rider rules and assign confidences (pure: no files).
+
+    Lesson-flagged rides are grouped like any other: 001's lesson flag also fires when someone
+    stands in the pool during an ordinary ride (20240924: 24 of 79 rides), so it cannot decide
+    who rode; such rides keep their "lesson" tag in the ride list.
+    """
+    rules = rules or RiderRules()
     described = {
         r.ride_id: app.rides[ride_key(r)]
         for r in rides
@@ -265,6 +263,21 @@ def build_riders(
     }
     vectors = {rid: app.vector(d) for rid, d in described.items()}
     spans = {r.ride_id: (r.start_s, r.end_s) for r in rides}
+    constraints = rules.constraints()
+    must, cannot = list(constraints.must), list(constraints.cannot)
+    for group in rules.mixed:  # split a mixed group in two by appearance, then keep it apart
+        present = [r for r in group if r in vectors]
+        if len(present) < 2:
+            continue
+        halves = group_rides(
+            {r: vectors[r] for r in present}, spans, app.distance,
+            threshold=float("inf"), overlap_allowed_s=overlap_allowed_s, stop_at=2,
+        )  # fmt: skip
+        if len(halves) == 2:
+            for half in halves:
+                must += [(half[0], r) for r in half[1:]]
+            cannot += [(a, b) for a in halves[0] for b in halves[1]]
+    constraints = Constraints(must=must, cannot=cannot, fixed=constraints.fixed)
     groups = group_rides(
         vectors, spans, app.distance,
         threshold=cfg.cluster_threshold, overlap_allowed_s=overlap_allowed_s,
@@ -273,11 +286,15 @@ def build_riders(
     low = {rid for rid, d in described.items() if d.desc.low_evidence}
     assigned = assign_confidence(groups, vectors, app.distance, low) if groups else []
 
+    names = {**rules.names, **rules.fixed}  # a fixed ride names its group too
     riders: list[RiderGroup] = []
     named_groups: set[int] = set()
     for gi, group in enumerate(groups):
-        name = next((names[r] for r in group if r in names), None)
-        if name is not None:
+        name = next((rules.fixed[r] for r in group if r in rules.fixed), None) or next(
+            (names[r] for r in group if r in names), None
+        )
+        ignored = any(r in rules.ignored for r in group)
+        if name is not None and not ignored:
             named_groups.add(gi)
         by_clarity = sorted(group, key=lambda r: described[r].desc.clarity, reverse=True)
         stills = [
@@ -289,35 +306,24 @@ def build_riders(
             RiderGroup(
                 rider_id=f"g{gi + 1:02d}",
                 name=name,
-                ignored=any(r in ignored for r in group),
+                ignored=ignored,
                 ride_ids=group,
                 example_ride_id=by_clarity[0],
                 stills=stills,
             )
         )
-    if lesson:
-        riders.append(
-            RiderGroup(
-                rider_id="lesson",
-                kind="lesson",
-                ride_ids=[r.ride_id for r in lesson],
-                example_ride_id=lesson[0].ride_id,
-            )
-        )
+    fixed = set(rules.fixed)
     queued = set(queue(assigned, named_groups, cfg.queue_below, fixed))
     assignments = [
         RideAssignment(
             ride_id=a.ride_id,
             rider_id=riders[a.group].rider_id,
-            confidence=a.confidence,
+            confidence=1.0 if a.ride_id in fixed else a.confidence,
             confirmed=a.ride_id in fixed,
             queued=a.ride_id in queued,
             low_evidence=a.ride_id in low,
         )
         for a in assigned
-    ]
-    assignments += [
-        RideAssignment(ride_id=r.ride_id, rider_id="lesson", confidence=1.0) for r in lesson
     ]
     assignments += [  # no usable crops of a person: no rider until the user says so
         RideAssignment(ride_id=r.ride_id, rider_id=None, confidence=0.0, low_evidence=True)

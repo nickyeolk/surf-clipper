@@ -121,6 +121,10 @@ export interface Ride {
   start_kind: string
   flags: RideFlags
   export: ExportRecord | null
+  rider?: string | null
+  rider_id?: string | null
+  rider_confidence?: number | null
+  rider_confirmed?: boolean
 }
 
 export interface ShortAttempt {
@@ -139,11 +143,12 @@ export interface Rides {
 }
 
 export type EditOp = 'trim' | 'split' | 'merge' | 'delete' | 'add' | 'undo'
+export type RiderOp = RiderEditRequest['op']
 
 export interface UserEdit {
   edit_id: number
   at: string
-  op: EditOp | 'confirm_zone'
+  op: EditOp | RiderOp | 'confirm_zone' | 'rider_unjoin'
   target: { epoch_id?: number | null; ride_id?: string | null; ride_ids?: string[] | null }
   payload: Record<string, unknown>
 }
@@ -173,6 +178,49 @@ export interface RiderLabelWork {
   items: RiderLabelItem[]
   named: string[]
   finalized: boolean
+}
+
+export interface RiderStill {
+  ride_id: string
+  t_s: number
+}
+
+export interface RiderGroup {
+  rider_id: string
+  label: string
+  name: string | null
+  ignored: boolean
+  kind: string
+  ride_ids: string[]
+  example_ride_id: string | null
+  stills: RiderStill[]
+}
+
+export interface RideAssignment {
+  ride_id: string
+  rider_id: string | null
+  confidence: number
+  confirmed: boolean
+  queued: boolean
+  low_evidence: boolean
+}
+
+export interface RidersInfo {
+  descriptor: string
+  riders: RiderGroup[]
+  assignments: RideAssignment[]
+  join_suggestions: { first: string; second: string; gap_s: number; confidence: number }[]
+}
+
+export interface RiderEditRequest {
+  op: 'rider_name' | 'rider_same_as' | 'rider_mixed' | 'rider_ignore' | 'ride_rider'
+  rider_id?: string
+  other_rider_id?: string
+  ride_id?: string
+  same_as_ride_id?: string
+  name?: string
+  not_name?: string
+  ignore?: boolean
 }
 
 export class ApiError extends Error {
@@ -211,7 +259,14 @@ export const api = {
       body: JSON.stringify(zone),
     }),
   keyframeUrl: (id: string, t: number) => `/api/sessions/${id}/keyframe.jpg?t=${Math.round(t)}`,
-  rides: (id: string) => call<Rides>(`/sessions/${id}/rides`),
+  rides: (id: string, rider?: string) =>
+    call<Rides>(`/sessions/${id}/rides${rider ? `?rider=${encodeURIComponent(rider)}` : ''}`),
+  riders: (id: string) => call<RidersInfo>(`/sessions/${id}/riders`),
+  riderEdit: (id: string, req: RiderEditRequest) =>
+    call<{ edit: UserEdit; riders: RiderGroup[] }>(`/sessions/${id}/rider-edits`, {
+      method: 'POST',
+      body: JSON.stringify(req),
+    }),
   edits: (id: string) => call<{ edits: UserEdit[] }>(`/sessions/${id}/edits`),
   edit: (
     id: string,
@@ -223,9 +278,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ op, target, payload }),
     }),
-  exportClips: (id: string, rides?: string[], reel = false) =>
-    call<Job>(`/sessions/${id}/export`, { method: 'POST', body: JSON.stringify({ rides: rides ?? null, reel }) }),
-  reelUrl: (id: string) => `/api/sessions/${id}/media/reel.mp4`,
+  exportClips: (id: string, rides?: string[], reel = false, rider?: string) =>
+    call<Job>(`/sessions/${id}/export`, {
+      method: 'POST',
+      body: JSON.stringify({ rides: rides ?? null, reel, rider: rider ?? null }),
+    }),
+  reelUrl: (id: string, rider?: string) =>
+    `/api/sessions/${id}/media/reel.mp4${rider ? `?rider=${encodeURIComponent(rider)}` : ''}`,
   sources: () => call<SourceVideo[]>('/sources'),
   addSession: (sourcePath: string, minLength: number | null) =>
     call<{ session_id: string; job: Job }>('/sessions', {

@@ -390,6 +390,65 @@ def eval_cmd(
     )
 
 
+riders_app = typer.Typer(no_args_is_help=True, help="Riders of a session (feature 002).")
+app.add_typer(riders_app, name="riders")
+
+
+@riders_app.command("list")
+def riders_list(
+    video: Path, artifacts: ArtifactsOpt = Path("artifacts"), as_json: JsonOpt = False
+) -> None:
+    """The session's riders: name (or "Rider N"), rides, example ride, queue length."""
+    from surfclip.store.schemas import Riders
+
+    store = SessionStore.open(video, artifacts)
+    if not store.path("riders.json").exists():
+        raise _fail("no riders yet: run `surfclip run` first", 2)
+    riders = store.read_model("riders.json", Riders)
+    if as_json:
+        typer.echo(riders.model_dump_json(indent=2))
+        return
+    for k, g in enumerate(riders.riders, start=1):
+        label = g.name or f"Rider {k}"
+        flag = " (ignored)" if g.ignored else ""
+        typer.echo(f"{label:16s} {len(g.ride_ids):3d} rides  e.g. {g.example_ride_id}{flag}")
+    queued = sum(1 for a in riders.assignments if a.queued)
+    typer.echo(f"{queued} rides to check in the review queue")
+
+
+@riders_app.command("name")
+def riders_name(
+    video: Path,
+    ride: Annotated[str, typer.Option("--ride", help="A ride of the rider to name.")],
+    name: Annotated[str, typer.Option("--name", help="The rider's name.")],
+    artifacts: ArtifactsOpt = Path("artifacts"),
+    config: ConfigOpt = DEFAULT_CONFIG_PATH,
+) -> None:
+    """Name the rider of RIDE (the whole group it is in)."""
+    from surfclip.riders.service import refresh_riders
+    from surfclip.store.schemas import Riders
+
+    store = SessionStore.open(video, artifacts)
+    riders = store.read_model("riders.json", Riders)
+    rides = {r.ride_id: r for r in store.read_model("rides.json", Rides).rides}
+    group = next((g for g in riders.riders if ride in g.ride_ids), None)
+    if group is None or ride not in rides:
+        raise _fail(f"no ride {ride} in this session's riders", 2)
+
+    def spans(ids: list[str]) -> dict[str, object]:
+        return {i: [rides[i].start_s, rides[i].end_s] for i in ids if i in rides}
+
+    examples = [ride, *(s.ride_id for s in group.stills)]
+    append_edit(
+        store,
+        "rider_name",
+        EditTarget(),
+        {"name": name, "rides": spans(group.ride_ids), "examples": spans(examples)},
+    )
+    refresh_riders(store, load_config(config, store.session.config_overrides))
+    typer.echo(f"named {len(group.ride_ids)} rides {name}")
+
+
 @app.command("eval-riders")
 def eval_riders_cmd(
     video: Path,

@@ -25,7 +25,7 @@ from surfclip.edits.rebuild import rebuild_rides
 from surfclip.eval.labels import LabelError, LabelWork, SessionLabels, finalize, work_from_rides
 from surfclip.eval.riders import RiderLabelWork, detected_grouping, propose_work
 from surfclip.eval.riders import finalize as finalize_riders
-from surfclip.media.export import REEL_FILE, export_reel, export_rides, read_exports
+from surfclip.media.export import export_reel, export_rides, read_exports, reel_file
 from surfclip.media.review import thumbnail
 from surfclip.process import (
     SourceNotAllowedError,
@@ -34,10 +34,20 @@ from surfclip.process import (
     process_session,
     rerun_rides,
 )
-from surfclip.riders.session import load_appearance, ride_key
+from surfclip.riders.service import refresh_riders
+from surfclip.riders.session import RIDERS_FILE, load_appearance, ride_key
 from surfclip.riders.stills import rider_still, still_path
 from surfclip.rides.evidence import Obs
-from surfclip.store.schemas import EditTarget, Rides, Session, SourceInfo, UserEdit, Zone
+from surfclip.store.schemas import (
+    EditTarget,
+    RiderGroup,
+    Riders,
+    Rides,
+    Session,
+    SourceInfo,
+    UserEdit,
+    Zone,
+)
 from surfclip.store.session import SessionStore, SourceLocationError, session_id_for
 from surfclip.zone.editing import confirm_zone, display_size, keyframe, rider_feet, zone_proposal
 from surfclip.zone.geometry import GeometryError
@@ -80,6 +90,24 @@ class EditRequest(BaseModel):
 class ExportRequest(BaseModel):
     rides: list[str] | None = None  # default: every ride (only new or changed ones re-encode)
     reel: bool = False  # also join the clips into one video (clips/reel.mp4)
+    rider: str | None = None  # only this rider's rides (name or rider id); reel_<rider>.mp4
+
+
+RiderOp = Literal["rider_name", "rider_same_as", "rider_mixed", "rider_ignore", "ride_rider"]
+
+
+class RiderEditRequest(BaseModel):
+    """Group ops name a group by ``rider_id`` (and ``other_rider_id`` for same-as); ride ops
+    name a ride by ``ride_id``. The server records the rides' spans (groups change on regroup)."""
+
+    op: RiderOp
+    rider_id: str | None = None
+    other_rider_id: str | None = None
+    ride_id: str | None = None
+    same_as_ride_id: str | None = None
+    name: str | None = None
+    not_name: str | None = None
+    ignore: bool = True
 
 
 class AddSessionRequest(BaseModel):
@@ -96,6 +124,20 @@ class SourceVideo(BaseModel):
     name: str
     size_bytes: int
     session_id: str | None  # already added
+
+
+def rider_labels(riders: Riders) -> dict[str, str]:
+    """Display name per rider id: the user's name, else "Rider N" (largest group first)."""
+    return {g.rider_id: g.name or f"Rider {k}" for k, g in enumerate(riders.riders, start=1)}
+
+
+def rider_ride_ids(riders: Riders, rider: str) -> set[str]:
+    """Ride ids of a rider given by id, user name or display name."""
+    labels = rider_labels(riders)
+    for g in riders.riders:
+        if rider in (g.rider_id, g.name, labels[g.rider_id]):
+            return set(g.ride_ids)
+    raise ApiError(404, "rider_not_found", f"no rider {rider}")
 
 
 def create_app(
@@ -265,8 +307,30 @@ def create_app(
         }
 
     @app.get("/api/sessions/{sid}/rides")
-    def get_rides(sid: str) -> dict[str, Any]:
-        return read(folder(sid) / "rides.json", Rides).model_dump(mode="json")
+    def get_rides(sid: str, rider: str | None = None) -> dict[str, Any]:
+        """Rides; each with its rider (when grouped). ``rider``: only that rider's rides."""
+        rides: Rides = read(folder(sid) / "rides.json", Rides)
+        out = rides.model_dump(mode="json")
+        riders_file = folder(sid) / "riders.json"
+        if not riders_file.exists():
+            if rider is not None:
+                raise ApiError(404, "not_ready", "riders are not grouped yet")
+            return out
+        riders = Riders.model_validate_json(riders_file.read_text(encoding="utf-8"))
+        label = rider_labels(riders)
+        conf = {a.ride_id: a for a in riders.assignments}
+        keep = rider_ride_ids(riders, rider) if rider is not None else None
+        rows: list[dict[str, Any]] = []
+        for r in out["rides"]:
+            a = conf.get(r["ride_id"])
+            r["rider"] = label.get(a.rider_id) if a and a.rider_id else None
+            r["rider_id"] = a.rider_id if a else None
+            r["rider_confidence"] = a.confidence if a else None
+            r["rider_confirmed"] = a.confirmed if a else False
+            if keep is None or r["ride_id"] in keep:
+                rows.append(r)
+        out["rides"] = rows
+        return out
 
     @app.get("/api/sessions/{sid}/activity")
     def get_activity(sid: str) -> dict[str, Any]:
@@ -495,7 +559,76 @@ def create_app(
                 payload["spans"] = {i: [by_id[i].start_s, by_id[i].end_s] for i in ids}
             edit = append_edit(store, req.op, req.target, payload)
             rides = rebuild_rides(store)
+            if store.path(RIDERS_FILE).exists():  # riders follow the rides (and rider undos)
+                refresh_riders(store, load_config(config_path, store.session.config_overrides))
         return {"edit": edit.model_dump(mode="json"), "rides": rides.model_dump(mode="json")}
+
+    # ---- riders (002) -------------------------------------------------------------------------
+    @app.get("/api/sessions/{sid}/riders")
+    def get_riders(sid: str) -> dict[str, Any]:
+        riders: Riders = read(folder(sid) / RIDERS_FILE, Riders)
+        out = riders.model_dump(mode="json")
+        labels = rider_labels(riders)
+        for g in out["riders"]:
+            g["label"] = labels[g["rider_id"]]
+        return out
+
+    @app.post("/api/sessions/{sid}/rider-edits")
+    def post_rider_edit(sid: str, req: RiderEditRequest) -> dict[str, Any]:
+        store = store_of(sid)
+        with write_lock:
+            riders: Riders = read(folder(sid) / RIDERS_FILE, Riders)
+            rides: Rides = read(folder(sid) / "rides.json", Rides)
+            by_ride = {r.ride_id: r for r in rides.rides}
+            groups = {g.rider_id: g for g in riders.riders}
+
+            def spans_of(ids: list[str]) -> dict[str, list[float]]:
+                return {i: [by_ride[i].start_s, by_ride[i].end_s] for i in ids if i in by_ride}
+
+            def group(rider_id: str | None) -> RiderGroup:
+                if rider_id is None or rider_id not in groups:
+                    raise ApiError(404, "rider_not_found", f"no rider {rider_id}")
+                return groups[rider_id]
+
+            def ride_ref(ride_id: str | None) -> list[object]:
+                if ride_id is None or ride_id not in by_ride:
+                    raise ApiError(404, "ride_not_found", f"no ride {ride_id}")
+                r = by_ride[ride_id]
+                return [r.ride_id, r.start_s, r.end_s]
+
+            payload: dict[str, object]
+            if req.op == "rider_name":
+                g = group(req.rider_id)
+                if not (req.name or "").strip():
+                    raise ApiError(400, "invalid_edit", "a name is needed")
+                seen = [g.example_ride_id or "", *(s.ride_id for s in g.stills)]
+                payload = {"name": req.name.strip() if req.name else "",
+                           "rides": spans_of(g.ride_ids), "examples": spans_of(seen)}  # fmt: skip
+            elif req.op == "rider_same_as":
+                g, other = group(req.rider_id), group(req.other_rider_id)
+                if g.rider_id == other.rider_id:
+                    raise ApiError(400, "invalid_edit", "pick another rider")
+                payload = {"rides": spans_of(g.ride_ids), "other": spans_of(other.ride_ids)}
+            elif req.op == "rider_mixed":
+                g = group(req.rider_id)
+                if len(g.ride_ids) < 2:
+                    raise ApiError(400, "invalid_edit", "a rider with one ride cannot be split")
+                payload = {"rides": spans_of(g.ride_ids)}
+            elif req.op == "rider_ignore":
+                payload = {"rides": spans_of(group(req.rider_id).ride_ids), "ignore": req.ignore}
+            else:  # ride_rider
+                payload = {"ride": ride_ref(req.ride_id)}
+                if req.name:
+                    payload["name"] = req.name.strip()
+                if req.same_as_ride_id:
+                    payload["same_as_ride"] = ride_ref(req.same_as_ride_id)
+                if req.not_name:
+                    payload["not_name"] = req.not_name
+                if len(payload) == 1:
+                    raise ApiError(400, "invalid_edit", "say who rode it (name, same as or not)")
+            edit = append_edit(store, req.op, EditTarget(), payload)
+            refresh_riders(store, load_config(config_path, store.session.config_overrides))
+        return {"edit": edit.model_dump(mode="json"), "riders": get_riders(sid)["riders"]}
 
     @app.post("/api/sessions/{sid}/export")
     def post_export(sid: str, req: ExportRequest) -> Job:
@@ -510,12 +643,24 @@ def create_app(
             def progress(i: int, n: int, rid: str) -> None:
                 report((i - 1) / max(n, 1), f"encoding {rid} ({i}/{n})")
 
+            ids = req.rides
+            if req.rider is not None:
+                riders = Riders.model_validate_json(
+                    store.path(RIDERS_FILE).read_text(encoding="utf-8")
+                )
+                ids = sorted(rider_ride_ids(riders, req.rider))
             if req.reel:
-                reel = export_reel(store, cfg.export, ride_ids=req.rides, progress=progress)
+                reel = export_reel(
+                    store,
+                    cfg.export,
+                    ride_ids=ids,
+                    progress=progress,
+                    out_name=reel_file(req.rider),
+                )
                 with write_lock:
                     rebuild_rides(store)
                 return {"reel": str(reel), "folder": str(store.path("clips"))}
-            done, skipped = export_rides(store, cfg.export, ride_ids=req.rides, progress=progress)
+            done, skipped = export_rides(store, cfg.export, ride_ids=ids, progress=progress)
             with write_lock:
                 rebuild_rides(store)
             return {"exported": done, "up_to_date": skipped, "folder": str(store.path("clips"))}
@@ -523,8 +668,8 @@ def create_app(
         return jobs.submit("export", sid, work)
 
     @app.get("/api/sessions/{sid}/media/reel.mp4")
-    def reel_video(sid: str) -> FileResponse:
-        path = folder(sid) / REEL_FILE
+    def reel_video(sid: str, rider: str | None = None) -> FileResponse:
+        path = folder(sid) / reel_file(rider)
         if not path.exists():
             raise ApiError(404, "not_exported", "no reel yet: export one first")
         return FileResponse(path, media_type="video/mp4")

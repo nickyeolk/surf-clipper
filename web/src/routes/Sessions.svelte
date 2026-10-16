@@ -121,6 +121,7 @@
                   >Zone{s.zone_confirmed && !s.zone_checked ? ' (not checked)' : ''}</a>
                 {#if s.has_review_copy && s.rides !== null}
                   <a class="button" href={`#/review/${s.session_id}`}>Review</a>
+                  <a class="button" href={`#/riders/${s.session_id}`}>Riders</a>
                   <a class="button secondary" href={`#/label/${s.session_id}`}>Label</a>
                   {#if s.labels_final}
                     <a class="button secondary" href={`#/rider-labels/${s.session_id}`}

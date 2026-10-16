@@ -69,17 +69,17 @@ play/export that rider's rides; compare with the rider labels
 
 ### Tests
 
-- [ ] T015 [P] [US1] Unit tests for rider edits in tests/unit/test_rider_edits.py: `rider_name` names the group holding its anchor rides and confirms the example rides; `rider_same_as` joins two groups; `rider_mixed` splits a group in two; `rider_ignore` excludes a group; anchors re-attach by IoU ≥ 0.5 after ride ids change; `undo` reverts a rider edit
-- [ ] T016 [P] [US1] Contract tests for `GET /sessions/{id}/riders`, `POST /sessions/{id}/rider-edits` (records spans, returns recomputed riders; 400 `invalid_edit`, 404 `ride_not_found`) and `GET /sessions/{id}/rides?rider=` in tests/contract/test_api_riders.py
+- [x] T015 [P] [US1] Unit tests for rider edits in tests/unit/test_rider_edits.py: `rider_name` names the group holding its anchor rides and confirms the example rides; `rider_same_as` joins two groups; `rider_mixed` splits a group in two; `rider_ignore` excludes a group; anchors re-attach by IoU ≥ 0.5 after ride ids change; `undo` reverts a rider edit
+- [x] T016 [P] [US1] Contract tests for `GET /sessions/{id}/riders`, `POST /sessions/{id}/rider-edits` (records spans, returns recomputed riders; 400 `invalid_edit`, 404 `ride_not_found`) and `GET /sessions/{id}/rides?rider=` in tests/contract/test_api_riders.py
 
 ### Implementation
 
-- [ ] T017 [US1] Implement rider edits in src/surfclip/riders/edits.py (R6): resolve anchors to current rides (reuse `iou` and the resolution rules of src/surfclip/edits/apply.py), turn edits into must-link / cannot-link / name / ignore constraints, apply them in src/surfclip/riders/cluster.py; until T015 passes
-- [ ] T018 [US1] Add riders routes to src/surfclip/api/app.py (`GET riders`, `POST rider-edits` recording ride spans server-side and recomputing within 2 s, `rides?rider=` filter with `rider`/`rider_confidence` per ride); until T016 passes
-- [ ] T019 [US1] Build the Riders screen in web/src/routes/Riders.svelte (route `#/riders/<id>`, R9): groups largest first with example ride (playable), stills strip, ride count; name field, "same as…", "mixed", "ignore"; unnamed groups shown as "Rider N"; Lesson group separate; links from Sessions and Review
-- [ ] T020 [US1] Add a rider filter to web/src/routes/Review.svelte: the filter drives the ride list, timeline bars, play-all and "export as one video" (export with `rider`); show each ride's rider and confidence
-- [ ] T021 [US1] Per-rider reel in src/surfclip/media/export.py and the export route: `rider` restricts to that rider's rides; output `clips/reel_<rider>.mp4`; `GET .../media/reel.mp4?rider=`
-- [ ] T022 [US1] `surfclip riders VIDEO` and `surfclip riders name VIDEO --ride ID --name NAME` in src/surfclip/cli.py per contracts/cli.md
+- [x] T017 [US1] Implement rider edits in src/surfclip/riders/edits.py (R6): resolve anchors to current rides (reuse `iou` and the resolution rules of src/surfclip/edits/apply.py), turn edits into must-link / cannot-link / name / ignore constraints, apply them in src/surfclip/riders/cluster.py; until T015 passes
+- [x] T018 [US1] Add riders routes to src/surfclip/api/app.py (`GET riders`, `POST rider-edits` recording ride spans server-side and recomputing within 2 s, `rides?rider=` filter with `rider`/`rider_confidence` per ride); until T016 passes
+- [x] T019 [US1] Build the Riders screen in web/src/routes/Riders.svelte (route `#/riders/<id>`, R9): groups largest first with example ride (playable), stills strip, ride count; name field, "same as…", "mixed", "ignore"; unnamed groups shown as "Rider N"; Lesson group separate; links from Sessions and Review
+- [x] T020 [US1] Add a rider filter to web/src/routes/Review.svelte: the filter drives the ride list, timeline bars, play-all and "export as one video" (export with `rider`); show each ride's rider and confidence
+- [x] T021 [US1] Per-rider reel in src/surfclip/media/export.py and the export route: `rider` restricts to that rider's rides; output `clips/reel_<rider>.mp4`; `GET .../media/reel.mp4?rider=`
+- [x] T022 [US1] `surfclip riders VIDEO` and `surfclip riders name VIDEO --ride ID --name NAME` in src/surfclip/cli.py per contracts/cli.md
 
 **Checkpoint**: "my rides" work end to end; measure SC-001 with `surfclip eval riders`
 

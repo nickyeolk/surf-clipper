@@ -98,12 +98,23 @@ def group_rides(
             if names[i] and names[j] and names[i] != names[j]:
                 cannot[i, j] = cannot[j, i] = True
 
-    # Average-linkage distances between nodes (node vector = mean of its rides).
-    vecs = [np.mean([descriptors[r] for r in g], axis=0) for g in members]
+    # Average-linkage distances between nodes: the mean distance between their rides. (Using
+    # the distance between node means instead made a named group, whose example rides are
+    # merged up front, swallow other riders: a mean is close to everything.)
+    pair: dict[tuple[str, str], float] = {}
+
+    def d(a: str, b: str) -> float:
+        key = (a, b) if a < b else (b, a)
+        if key not in pair:
+            pair[key] = distance(descriptors[a], descriptors[b])
+        return pair[key]
+
     dist = np.full((n, n), np.inf)
     for i in range(n):
         for j in range(i + 1, n):
-            dist[i, j] = dist[j, i] = distance(vecs[i], vecs[j])
+            dist[i, j] = dist[j, i] = float(
+                np.mean([d(a, b) for a in members[i] for b in members[j]])
+            )
     size = np.array([len(g) for g in members], dtype=np.float64)
     alive = np.ones(n, dtype=bool)
     while int(alive.sum()) > stop_at:

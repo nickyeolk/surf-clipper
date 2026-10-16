@@ -20,6 +20,10 @@ from surfclip.store.schemas import Edits, Ride, RideFlags, Rides, UserEdit
 log = logging.getLogger(__name__)
 
 REATTACH_IOU = 0.5
+# Rider edits (002) do not change rides; riders/edits.py applies them.
+RIDER_OPS = frozenset(
+    {"rider_name", "rider_same_as", "rider_mixed", "rider_ignore", "ride_rider", "rider_unjoin"}
+)
 
 
 def _num(edit: UserEdit, key: str) -> float:
@@ -60,7 +64,7 @@ def _spans(edit: UserEdit) -> dict[str, tuple[float, float]]:
     return out
 
 
-def _resolve(rid: str, span: tuple[float, float] | None, rides: dict[str, Ride]) -> str | None:
+def resolve_ride(rid: str, span: tuple[float, float] | None, rides: dict[str, Ride]) -> str | None:
     """The current id of the ride an edit pointed at (see module docstring)."""
     if span is None:
         return rid if rid in rides else None
@@ -106,7 +110,7 @@ def apply_edits(detected: Rides, edits: Edits) -> Rides:
     rides: dict[str, Ride] = {r.ride_id: r for r in detected.rides}
     undone = undone_ids(edits)
     for edit in edits.edits:
-        if edit.op in ("confirm_zone", "undo") or edit.edit_id in undone:
+        if edit.op in ("confirm_zone", "undo") or edit.op in RIDER_OPS or edit.edit_id in undone:
             continue
         if edit.op == "add":
             rid = f"u{edit.edit_id:04d}"
@@ -115,7 +119,7 @@ def apply_edits(detected: Rides, edits: Edits) -> Rides:
         tgt = edit.target
         wanted = tgt.ride_ids or ([tgt.ride_id] if tgt.ride_id else [])
         spans = _spans(edit)
-        ids = [_resolve(w, spans.get(w), rides) for w in wanted]
+        ids = [resolve_ride(w, spans.get(w), rides) for w in wanted]
         found = [i for i in ids if i is not None]
         if edit.op == "trim" and wanted and not found:
             # The ride is gone after a re-run: keep the user's version of it.
