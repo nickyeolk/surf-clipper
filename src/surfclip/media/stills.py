@@ -39,13 +39,14 @@ def read_stills(store: SessionStore) -> Stills:
     return store.read_model(STILLS_FILE, Stills) if path.exists() else Stills()
 
 
-def _ride_at(store: SessionStore, t: float) -> tuple[str | None, str | None]:
-    """The ride (and its rider's label) shown at t: within the ride, else within its clip."""
+def _ride_at(store: SessionStore, t: float, tol: float) -> tuple[str | None, str | None]:
+    """The ride (and its rider's label) shown at t: within the ride, else within its clip.
+    ``tol`` (half a frame) covers a clip's first frame, which snapping may put just before it."""
     if not store.path("rides.json").exists():
         return None, None
     rides = store.read_model("rides.json", Rides).rides
     hit = next((r for r in rides if r.start_s <= t <= r.end_s), None) or next(
-        (r for r in rides if r.clip_start_s <= t <= r.clip_end_s), None
+        (r for r in rides if r.clip_start_s - tol <= t <= r.clip_end_s + tol), None
     )
     if hit is None:
         return None, None
@@ -63,7 +64,7 @@ def save_still(store: SessionStore, cfg: CompilationConfig, t_s: float) -> tuple
     frame, t = snap(t_s, info.avg_fps)
     if t_s < 0 or t >= info.duration_s:
         raise StillError(f"{t_s:.2f} s is outside the video (0-{info.duration_s:.1f} s)")
-    ride_id, rider = _ride_at(store, t)
+    ride_id, rider = _ride_at(store, t, 0.5 / info.avg_fps)
     name = f"{ride_id or 't'}_f{frame:06d}.jpg"
     stills = read_stills(store)
     existing = next((s for s in stills.stills if s.name == name), None)

@@ -1,6 +1,7 @@
 # HTTP API (003 additions and changes)
 
-All routes on loopback, JSON unless noted; errors as in 001 (`{"detail": "..."}`).
+All routes on loopback, JSON unless noted; errors as in 001
+(`{"error": {"code": "...", "message": "..."}}`).
 
 ## Changed
 
@@ -24,16 +25,17 @@ What the viewer lists.
 {
   "fps": 30.0,
   "compilations": [
-    {"rider": "me", "rider_id": "g1", "url": "/api/sessions/9ac6901941/media/reel.mp4?rider=me",
+    {"rider": "me", "url": "/api/sessions/9ac6901941/media/reel.mp4?rider=me",
      "current": true, "made_at": "2026-10-16T10:00:00Z",
      "rides": [{"ride_id": "r004302", "offset_s": 0.0, "duration_s": 34.1,
                 "clip_start_s": 143.4, "caption": "me · ride 1 of 12 · 2:23"}]}
   ],
   "riders": [
-    {"rider": "me", "rider_id": "g1", "clips": [
+    {"rider": "me", "clips": [
       {"ride_id": "r004302", "url": "/api/sessions/9ac6901941/media/clips/r004302.mp4",
        "clip_start_s": 143.4, "duration_s": 34.1}]}
   ],
+  "unassigned": [],
   "stills": [
     {"name": "r004302_f004512.jpg", "url": "/api/sessions/9ac6901941/media/stills/r004302_f004512.jpg",
      "t_s": 150.4, "frame": 4512, "ride_id": "r004302", "rider": "me", "width": 1920, "height": 1080}

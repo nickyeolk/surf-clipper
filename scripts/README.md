@@ -10,7 +10,9 @@ Each script's header has its usage.
 | --- | --- |
 | `wsl-env.sh`, `wsl-run.sh` | WSL environment (venv location, Node/IPv4 settings); run a command in it |
 | `check.sh` | ruff format/lint, pyright, pytest |
-| `serve.cmd` | Windows launcher for `surfclip serve` (UI at http://localhost:8765) |
+| `serve.cmd` | Windows launcher for `surfclip serve` with a console window (fallback) |
+| `windows/install-shortcuts.ps1` | One-time: build the UI, put "Surf Clipper" / "Stop Surf Clipper" on the Desktop |
+| `windows/start.ps1`, `windows/stop.ps1` | Hidden start (waits for `/api/health`, opens the browser; log in `artifacts/logs/server.log`) and stop (`/api/shutdown`) |
 
 ## Running and scoring sessions
 

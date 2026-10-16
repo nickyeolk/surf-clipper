@@ -4,7 +4,7 @@
   // re-running detection later keeps it (FR-022). Undo appends an "undo" edit.
   import {
     api, clock, type Activity, type Job, type Ride, type Rides, type ShortAttempt, type SourceInfo,
-    type UserEdit, type EditOp,
+    type UserEdit, type EditOp, type StillInfo,
   } from '../lib/api'
   import Timeline, { type Bar } from '../lib/Timeline.svelte'
 
@@ -352,6 +352,18 @@
     }
   }
 
+  // 003: save the frame on screen as a full-resolution still (the player's time is source time)
+  let saved = $state<StillInfo | null>(null)
+  async function saveStill() {
+    video?.pause()
+    try {
+      saved = await api.saveStill(sessionId, current)
+      status = `saved still at frame ${saved.frame}`
+    } catch (e) {
+      status = `still not saved: ${(e as Error).message}`
+    }
+  }
+
   function onkeydown(e: KeyboardEvent) {
     if ((e.target as HTMLElement).tagName === 'INPUT') return
     const k = e.key
@@ -371,6 +383,7 @@
     else if (k === 'k') keepShort()
     else if (k === 'n') addRide()
     else if (k === 'u') undo()
+    else if (k === 'c') void saveStill()
     else if (k === 'r') startReel()
     else if (k === ',' && reel) goReel(Math.max(0, reelIdx - 1), !paused)
     else if (k === '.' && reel) goReel(Math.min(rideList.length - 1, reelIdx + 1), !paused)
@@ -411,6 +424,11 @@
         <button onclick={() => step(1)} title="Forward one frame (→)">frame ▶︎</button>
         <button onclick={() => step(Math.round(1 / frame))} title="Forward 1 s (Shift+→)">+1s</button>
         <span class="time">{clock(current)} / {clock(duration)}</span>
+        <button onclick={saveStill} title="Save this frame as a full-resolution photo (c)">save still</button>
+        {#if saved}
+          <a class="small" href={saved.url} target="_blank" rel="noreferrer" title="Open the still">
+            <img class="saved" src={saved.url} alt="saved still" /></a>
+        {/if}
         <span class="rates">
           {#each RATES as r}
             <button class:active={rate === r} onclick={() => setRate(r)}>{r}×</button>
@@ -597,6 +615,12 @@
 {/if}
 
 <style>
+  .saved {
+    height: 28px;
+    vertical-align: middle;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+  }
   .thumb {
     width: 96px;
     height: 54px;

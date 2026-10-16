@@ -1,6 +1,7 @@
 # Start Surf Session Clipper without a console (003 research R5) and open it in the browser.
 # Run by the "Surf Clipper" desktop shortcut (scripts\windows\install-shortcuts.ps1).
-# If the server is already running, this only opens the browser.
+# If the server is already running, this only opens the browser. -NoBrowser: start only.
+param([switch]$NoBrowser)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $port = 8765
@@ -10,7 +11,8 @@ $url = "http://localhost:$port"
 $log = Join-Path $repo 'artifacts\logs\server.log'
 
 function Test-Up {
-    try { return [bool](Invoke-RestMethod -Uri "$url/api/health" -TimeoutSec 2).ok } catch { return $false }
+    # 127.0.0.1, not localhost: Windows PowerShell tries IPv6 ::1 first, which WSL does not forward.
+    try { return [bool](Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/health" -TimeoutSec 2).ok } catch { return $false }
 }
 
 if (-not (Test-Up)) {
@@ -32,4 +34,4 @@ if (-not (Test-Up)) {
         Start-Sleep -Milliseconds 500
     }
 }
-Start-Process $url
+if (-not $NoBrowser) { Start-Process $url }

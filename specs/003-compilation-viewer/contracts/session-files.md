@@ -26,7 +26,7 @@ clips/
                 "span": [143.4, 177.5], "duration_s": 34.1}
   },
   "compilations": {
-    "g1": {"rider_id": "g1", "rider": "me", "path": "clips/reel_me.mp4",
+    "me": {"rider": "me", "path": "clips/reel_me.mp4",
            "made_at": "2026-10-16T10:00:00Z",
            "rides": [{"ride_id": "r004302", "offset_s": 0.0, "duration_s": 34.1,
                       "clip_start_s": 143.4, "caption": "me · ride 1 of 12 · 2:23"}]}

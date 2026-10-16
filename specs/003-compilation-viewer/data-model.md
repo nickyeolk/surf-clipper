@@ -22,11 +22,13 @@ Text burned into the first `caption_s` seconds of a ride in a compilation.
 | span | (float, float) | clip span, as `ExportRecord.span` |
 | duration_s | float | measured after encoding (for offsets) |
 
-## Compilation (`clips/compilations.json`, one record per rider)
+## Compilation (`clips/compilations.json`, one record per rider, keyed by display name)
+
+002 rider ids are only stable within one computation, so records are keyed by the rider's
+display name (the same name the file is named after).
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| rider_id | str | 002 rider id |
 | rider | str | display name at export time |
 | path | str | `clips/reel_<slug>.mp4` |
 | made_at | datetime | |
