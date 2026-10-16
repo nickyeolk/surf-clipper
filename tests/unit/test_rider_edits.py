@@ -61,7 +61,7 @@ def build(rides: list[Ride], edits: Edits) -> Riders:
 
 RIDES = [ride(k) for k in range(9)]
 NAME_A: Edit = ("rider_name", {"name": "me", "rides": spans(0, 3, 6), "examples": spans(0, 3)})
-NAME_B: Edit = ("rider_name", {"name": "marcus", "rides": spans(1, 4, 7), "examples": spans(1)})
+NAME_B: Edit = ("rider_name", {"name": "pat", "rides": spans(1, 4, 7), "examples": spans(1)})
 SAME: Edit = ("rider_same_as", {"rides": spans(0, 3, 6), "other": spans(1, 4, 7)})
 AB = ["r0", "r1", "r3", "r4", "r6", "r7"]
 
@@ -111,16 +111,16 @@ def test_move_to_a_name_and_out_of_a_name() -> None:
 
 
 def test_moving_a_shown_example_keeps_both_named_riders() -> None:
-    """20261012: one of "me"'s stills was marcus's ride; moving it must not merge the two."""
+    """20261012: one of "me"'s stills was pat's ride; moving it must not merge the two."""
     move: Edit = ("ride_rider", {"ride": ref(3), "same_as_ride": ref(1), "away_from": ref(0)})
     riders = build(RIDES, log(NAME_A, NAME_B, move))
-    assert card(riders, "r1") == ("marcus", ["r1", "r3", "r4", "r7"], False)
+    assert card(riders, "r1") == ("pat", ["r1", "r3", "r4", "r7"], False)
     assert card(riders, "r0") == ("me", ["r0", "r6"], False)
 
 
 def test_same_as_between_named_riders_keeps_the_first_name() -> None:
     riders = build(RIDES, log(NAME_A, NAME_B, SAME))
-    assert card(riders, "r4")[0] == "me" and all(g.name != "marcus" for g in riders.riders)
+    assert card(riders, "r4")[0] == "me" and all(g.name != "pat" for g in riders.riders)
 
 
 def test_undo_and_reattach_after_rerun() -> None:

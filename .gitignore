@@ -16,3 +16,6 @@ __pycache__/
 
 # Claude Code local settings (skills in .claude/skills are committed)
 .claude/settings.local.json
+
+# Rider labels hold real people's names: kept on this machine only
+labels/riders/
