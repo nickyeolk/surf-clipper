@@ -10,7 +10,7 @@ from collections.abc import Callable
 
 from surfclip.config import Config
 from surfclip.edits.log import read_edits
-from surfclip.riders.edits import rider_rules
+from surfclip.riders.edits import rider_ops
 from surfclip.riders.session import RIDERS_FILE, build_riders, describe_rides, ride_key
 from surfclip.store.schemas import Riders, Rides
 from surfclip.store.session import SessionStore
@@ -40,7 +40,7 @@ def refresh_riders(store: SessionStore, config: Config, progress: Progress | Non
         app,
         config.riders,
         overlap_allowed_s=config.rides.changeover_overlap_max_s,
-        rules=rider_rules(read_edits(store), rides.rides),
+        ops=rider_ops(read_edits(store), rides.rides),
     )
     store.write_model(RIDERS_FILE, riders)
     return riders

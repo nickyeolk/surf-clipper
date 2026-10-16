@@ -22,7 +22,7 @@ from numpy.typing import NDArray
 
 from surfclip.config import RidersConfig
 from surfclip.riders.assign import assign_confidence, queue
-from surfclip.riders.cluster import Constraints, group_rides, split_two
+from surfclip.riders.cluster import group_rides
 from surfclip.riders.crops import read_frames, ride_crops, ride_moments
 from surfclip.riders.describe import (
     DESC_LEN,
@@ -35,7 +35,7 @@ from surfclip.riders.describe import (
     hue_weight,
     ride_descriptor,
 )
-from surfclip.riders.edits import RiderRules
+from surfclip.riders.edits import Card, RiderOp, apply_ops
 from surfclip.riders.stills import save_still
 from surfclip.rides.evidence import Obs
 from surfclip.store.schemas import (
@@ -247,82 +247,49 @@ def build_riders(
     cfg: RidersConfig,
     *,
     overlap_allowed_s: float,
-    rules: RiderRules | None = None,
+    ops: list[RiderOp] | None = None,
 ) -> Riders:
-    """Group the rides under the user's rider rules and assign confidences (pure: no files).
+    """Group the rides by appearance, apply the user's actions in order, assign confidences
+    (pure: no files).
 
-    Lesson-flagged rides are grouped like any other: 001's lesson flag also fires when someone
-    stands in the pool during an ordinary ride (20240924: 24 of 79 rides), so it cannot decide
-    who rode; such rides keep their "lesson" tag in the ride list.
+    The grouping itself never sees the user's actions: they are applied to its cards afterwards,
+    so an action changes only what it touches. Lesson-flagged rides are grouped like any other:
+    001's lesson flag also fires when someone stands in the pool during an ordinary ride
+    (20240924: 24 of 79 rides), so it cannot decide who rode.
     """
-    rules = rules or RiderRules()
     described = {
         r.ride_id: app.rides[ride_key(r)]
         for r in rides
         if ride_key(r) in app.rides and app.usable(app.rides[ride_key(r)])
     }
-    placed = rules.placed  # rides the user placed by hand: attached after grouping
-    vectors = {rid: app.vector(d) for rid, d in described.items() if rid not in placed}
+    vectors = {rid: app.vector(d) for rid, d in described.items()}
     spans = {r.ride_id: (r.start_s, r.end_s) for r in rides}
-    constraints = rules.constraints()
-    must, cannot = list(constraints.must), list(constraints.cannot)
-    for group in rules.mixed:  # split a mixed group in two by appearance and keep them apart
-        present = [r for r in group if r in vectors]
-        if len(present) < 2:
-            continue
-        first, second = split_two(present, vectors, app.distance)
-        # Only "apart" rules: each half may still regroup, and single rides can still be moved.
-        across = {(a, b) for a in first for b in second} | {(b, a) for a in first for b in second}
-        must = [pair for pair in must if pair not in across]  # a later "mixed" wins
-        cannot += [(a, b) for a in first for b in second]
-    constraints = Constraints(must=must, cannot=cannot, fixed=constraints.fixed)
     groups = group_rides(
         vectors, spans, app.distance,
         threshold=cfg.cluster_threshold, overlap_allowed_s=overlap_allowed_s,
-        constraints=constraints,
     )  # fmt: skip
+    cards = apply_ops([Card(list(g)) for g in groups], ops or [], vectors, app.distance)
+    for card in cards:
+        card.rides.sort(key=lambda r: spans[r][0])
+
     low = {rid for rid, d in described.items() if d.desc.low_evidence}
-    assigned = assign_confidence(groups, vectors, app.distance, low) if groups else []
-
-    names = {**rules.names, **rules.fixed}  # a fixed ride names its group too
-    group_names: list[str | None] = [
-        next((rules.fixed[r] for r in g if r in rules.fixed), None)
-        or next((names[r] for r in g if r in names), None)
-        for g in groups
-    ]
-    # Attach hand-placed rides: to the card of the ride they ride with, or to the named rider
-    # (a new card when no card has that name yet).
-    groups = [list(g) for g in groups]
-    where = {r: gi for gi, g in enumerate(groups) for r in g}
-
-    def place(ride: str, seen: frozenset[str] = frozenset()) -> int:
-        if ride in where:
-            return where[ride]
-        if ride in rules.attach and ride not in seen:
-            gi = place(rules.attach[ride], seen | {ride})
-        elif ride in rules.attach_name and rules.attach_name[ride] in group_names:
-            gi = group_names.index(rules.attach_name[ride])
-        else:  # a new card (a new named rider, or a loop of placements)
-            groups.append([])
-            group_names.append(rules.attach_name.get(ride))
-            gi = len(groups) - 1
-        groups[gi].append(ride)
-        where[ride] = gi
-        return gi
-
-    for ride in sorted((r for r in placed if r in spans), key=lambda r: spans[r][0]):
-        place(ride)
-    for g in groups:
-        g.sort(key=lambda r: spans[r][0])
+    scored = [[r for r in c.rides if r in vectors] for c in cards]
+    index = [k for k, s in enumerate(scored) if s]  # cards with appearance to compare
+    assigned = {
+        a.ride_id: a
+        for a in assign_confidence([scored[k] for k in index], vectors, app.distance, low)
+    }
+    named_cards = {
+        pos for pos, k in enumerate(index) if cards[k].name is not None and not cards[k].ignored
+    }
+    confirmed = {r for c in cards for r in c.confirmed}
+    queued = set(queue(list(assigned.values()), named_cards, cfg.queue_below, confirmed))
 
     riders: list[RiderGroup] = []
-    named_groups: set[int] = set()
-    for gi, group in enumerate(groups):
-        name = group_names[gi]
-        ignored = any(r in rules.ignored for r in group)
-        if name is not None and not ignored:
-            named_groups.add(gi)
-        seen = [r for r in group if r in described]
+    assignments: list[RideAssignment] = []
+    for gi, card in enumerate(cards):
+        rider_id = f"g{gi + 1:02d}"
+        seen = [r for r in card.rides if r in described]
         by_clarity = sorted(seen, key=lambda r: described[r].desc.clarity, reverse=True)
         stills = [
             RiderStill(ride_id=r, t_s=t)
@@ -331,38 +298,32 @@ def build_riders(
         ]
         riders.append(
             RiderGroup(
-                rider_id=f"g{gi + 1:02d}",
-                name=name,
-                ignored=ignored,
-                ride_ids=group,
-                example_ride_id=by_clarity[0] if by_clarity else group[0],
+                rider_id=rider_id,
+                name=card.name,
+                ignored=card.ignored,
+                ride_ids=card.rides,
+                example_ride_id=by_clarity[0] if by_clarity else card.rides[0],
                 stills=stills,
             )
         )
-    fixed = set(rules.fixed) | placed
-    queued = set(queue(assigned, named_groups, cfg.queue_below, fixed))
-    assignments = [
-        RideAssignment(
-            ride_id=a.ride_id,
-            rider_id=riders[a.group].rider_id,
-            confidence=1.0 if a.ride_id in fixed else a.confidence,
-            confirmed=a.ride_id in fixed,
-            queued=a.ride_id in queued,
-            low_evidence=a.ride_id in low,
-        )
-        for a in assigned
-    ]
-    assignments += [  # placed by the user: certain
-        RideAssignment(
-            ride_id=r, rider_id=riders[where[r]].rider_id, confidence=1.0, confirmed=True
-        )
-        for r in sorted(placed)
-        if r in where
-    ]
+        for r in card.rides:
+            a = assigned.get(r)
+            sure = r in confirmed
+            assignments.append(
+                RideAssignment(
+                    ride_id=r,
+                    rider_id=rider_id,
+                    confidence=1.0 if sure or a is None else a.confidence,
+                    confirmed=sure,
+                    queued=r in queued,
+                    low_evidence=r in low or r not in described,
+                )
+            )
+    placed = {r for c in cards for r in c.rides}
     assignments += [  # no usable crops of a person: no rider until the user says so
         RideAssignment(ride_id=r.ride_id, rider_id=None, confidence=0.0, low_evidence=True)
         for r in rides
-        if r.ride_id not in described and r.ride_id not in where
+        if r.ride_id not in placed
     ]
     return Riders(
         session_id=session_id, descriptor=app.mode, riders=riders, assignments=assignments
