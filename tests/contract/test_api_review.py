@@ -133,3 +133,23 @@ def test_exported_clip_is_served_with_range(client: TestClient, root: Path) -> N
     )
     r = client.get(f"{S}/media/clips/r004512.mp4", headers={"Range": "bytes=0-99"})
     assert r.status_code == 206 and len(r.content) == 100
+
+
+def test_deleted_rides_can_be_restored(client: TestClient) -> None:
+    """Deleted rides are listed with where they were; restoring appends undo edits only."""
+    client.post(f"{S}/edits", json={"op": "split", "target": {"ride_id": "r004512"},
+                                   "payload": {"at_s": 160.0}})  # fmt: skip
+    halves = client.get(f"{S}/rides").json()["rides"]
+    assert len(halves) == 2
+    second = halves[1]["ride_id"]
+    client.post(f"{S}/edits", json={"op": "delete", "target": {"ride_id": second}})
+    assert len(client.get(f"{S}/rides").json()["rides"]) == 1
+    (gone,) = client.get(f"{S}/deleted").json()
+    assert gone["ride_id"] == second and gone["start_s"] == pytest.approx(160.0, abs=0.1)
+    assert client.post(f"{S}/restore", json={"edit_ids": [999]}).status_code == 404
+    r = client.post(f"{S}/restore", json={"edit_ids": None})
+    assert r.status_code == 200 and r.json()["restored"] == [gone["edit_id"]]
+    assert len(r.json()["rides"]["rides"]) == 2  # the split stays, the half is back
+    assert client.get(f"{S}/deleted").json() == []
+    ops = [(e["op"], e["payload"].get("edit_id")) for e in client.get(f"{S}/edits").json()["edits"]]
+    assert ops[-1] == ("undo", gone["edit_id"]) and ops[0][0] == "split"

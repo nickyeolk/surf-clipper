@@ -236,6 +236,14 @@ export interface RiderEditRequest {
 }
 
 // ---- 003: health, exports viewer, stills ----------------------------------------------------
+export interface DeletedRide {
+  edit_id: number
+  ride_id: string
+  start_s: number | null
+  end_s: number | null
+  at: string
+}
+
 export interface Health {
   ok: boolean
   version: string
@@ -374,6 +382,12 @@ export const api = {
   job: (jobId: string) => call<Job>(`/jobs/${jobId}`),
   thumbUrl: (id: string, t: number) => `/api/sessions/${id}/media/thumb.jpg?t=${(Math.round(t * 2) / 2).toFixed(1)}`,
   clipUrl: (id: string, rideId: string) => `/api/sessions/${id}/media/clips/${rideId}.mp4`,
+  deleted: (id: string) => call<DeletedRide[]>(`/sessions/${id}/deleted`),
+  restore: (id: string, editIds: number[] | null) =>
+    call<{ restored: number[]; rides: Rides }>(`/sessions/${id}/restore`, {
+      method: 'POST',
+      body: JSON.stringify({ edit_ids: editIds }),
+    }),
   health: () => call<Health>('/health'),
   downloadModels: () => call<Job>('/models/download', { method: 'POST' }),
   shutdown: () => call<{ stopping: boolean }>('/shutdown', { method: 'POST' }),

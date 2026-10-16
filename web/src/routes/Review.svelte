@@ -4,7 +4,7 @@
   // re-running detection later keeps it (FR-022). Undo appends an "undo" edit.
   import {
     api, clock, type Activity, type Job, type Ride, type Rides, type ShortAttempt, type SourceInfo,
-    type UserEdit, type EditOp, type StillInfo,
+    type UserEdit, type EditOp, type StillInfo, type DeletedRide,
   } from '../lib/api'
   import Timeline, { type Bar } from '../lib/Timeline.svelte'
 
@@ -352,6 +352,35 @@
     }
   }
 
+  // Deleted rides: listed so they can be played and brought back (an undo of just that delete;
+  // splits and trims made around it stay).
+  let deleted = $state<DeletedRide[]>([])
+  $effect(() => {
+    void edits.length // refresh whenever an edit is made or undone
+    api.deleted(sessionId).then((d) => (deleted = d)).catch(() => {})
+  })
+  function playDeleted(d: DeletedRide) {
+    if (!video || d.start_s === null || d.end_s === null) return
+    seek(d.start_s - 1)
+    stopAt = d.end_s + 1
+    void video.play()
+  }
+  async function restore(editIds: number[] | null) {
+    if (editIds === null && !confirm(`Bring back all ${deleted.length} deleted rides?`)) return
+    if (busy) return
+    busy = true
+    try {
+      const res = await api.restore(sessionId, editIds)
+      rides = await api.rides(sessionId)
+      edits = (await api.edits(sessionId)).edits
+      status = `restored ${res.restored.length} ride${res.restored.length === 1 ? '' : 's'}`
+    } catch (e) {
+      status = (e as Error).message
+    } finally {
+      busy = false
+    }
+  }
+
   // 003: save the frame on screen as a full-resolution still (the player's time is source time)
   let saved = $state<StillInfo | null>(null)
   async function saveStill() {
@@ -585,6 +614,33 @@
           undo
         </button>
       </div>
+      {#if deleted.length}
+        <details class="deleted small">
+          <summary>deleted rides ({deleted.length})</summary>
+          <div class="row">
+            <button onclick={() => restore(null)} disabled={busy}>restore all</button>
+            <span class="muted">splits and trims you made stay</span>
+          </div>
+          <ol class="list">
+            {#each deleted as d (d.edit_id + d.ride_id)}
+              <li class="del">
+                {#if d.start_s !== null && d.end_s !== null}
+                  <button class="item" onclick={() => playDeleted(d)} title="Play this deleted ride">
+                    <img class="thumb" loading="lazy" alt="" src={api.thumbUrl(sessionId, thumbAt(d.start_s, d.end_s))} />
+                    <span class="meta">
+                      <span class="time">{clock(d.start_s)}</span>
+                      <span class="muted">{(d.end_s - d.start_s).toFixed(1)} s</span>
+                    </span>
+                  </button>
+                {:else}
+                  <span class="muted">{d.ride_id}</span>
+                {/if}
+                <button onclick={() => restore([d.edit_id])} disabled={busy}>restore</button>
+              </li>
+            {/each}
+          </ol>
+        </details>
+      {/if}
       {#if rideList.length === 0}
         <p class="small">No rides found. If people were riding, check the
           <a href={`#/zone/${sessionId}`}>wave zone</a>, or lower the minimum ride length.</p>
@@ -615,6 +671,22 @@
 {/if}
 
 <style>
+  .deleted {
+    margin: 6px 0;
+  }
+  .deleted summary {
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .del {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .del .item {
+    flex: 1;
+    opacity: 0.7;
+  }
   .saved {
     height: 28px;
     vertical-align: middle;

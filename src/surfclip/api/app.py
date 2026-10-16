@@ -26,6 +26,7 @@ from surfclip.config import DEFAULT_CONFIG_PATH, load_config
 from surfclip.edits.apply import RIDER_OPS, undone_ids
 from surfclip.edits.log import append_edit, confirmed_zone, read_edits
 from surfclip.edits.rebuild import AUTO_JOINS_FILE, rebuild_rides
+from surfclip.edits.restore import DeletedRide, deleted_rides, restore_deleted
 from surfclip.eval.labels import LabelError, LabelWork, SessionLabels, finalize, work_from_rides
 from surfclip.eval.riders import RiderLabelWork, detected_grouping, propose_work
 from surfclip.eval.riders import finalize as finalize_riders
@@ -150,6 +151,10 @@ class StillRequest(BaseModel):
 class AddSessionRequest(BaseModel):
     source_path: str
     min_length_s: float | None = None
+
+
+class RestoreRequest(BaseModel):
+    edit_ids: list[int] | None = None  # None: every deleted ride
 
 
 class RerunRequest(BaseModel):
@@ -596,6 +601,24 @@ def create_app(
     def get_edits(sid: str) -> dict[str, Any]:
         edits = read_edits(store_of(sid))
         return edits.model_dump(mode="json")
+
+    @app.get("/api/sessions/{sid}/deleted")
+    def get_deleted(sid: str) -> list[DeletedRide]:
+        return deleted_rides(read_edits(store_of(sid)))
+
+    @app.post("/api/sessions/{sid}/restore")
+    def post_restore(sid: str, req: RestoreRequest) -> dict[str, Any]:
+        """Bring deleted rides back (appends undo edits; splits and trims stay)."""
+        store = store_of(sid)
+        with write_lock:
+            try:
+                restored = restore_deleted(store, req.edit_ids)
+            except KeyError as exc:
+                raise ApiError(404, "not_deleted", f"not a deleted ride: {exc.args[0]}") from exc
+            rides = rebuild_rides(store)
+            if store.path(RIDERS_FILE).exists():
+                refresh_riders(store, load_config(config_path, store.session.config_overrides))
+        return {"restored": restored, "rides": rides.model_dump(mode="json")}
 
     @app.post("/api/sessions/{sid}/edits")
     def post_edit(sid: str, req: EditRequest) -> dict[str, Any]:
