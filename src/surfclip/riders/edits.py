@@ -215,7 +215,10 @@ def apply_ops(
                 if target is None:
                     target = Card([], op.name)
                     cards.append(target)
-            if target is None or target is source:
+            if target is None:
+                continue
+            if target is source:  # "yes, that's right": the ride stays and is confirmed
+                target.confirmed.add(ride)
                 continue
             if source is not None:
                 source.rides.remove(ride)

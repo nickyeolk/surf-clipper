@@ -93,9 +93,9 @@ play/export that rider's rides; compare with the rider labels
 session (SC-002 ≤ 10)
 
 - [ ] T023 [P] [US2] Unit tests in tests/unit/test_rider_assign.py: confidence = margin to the nearest other rider; queue holds only rides below `queue_below` whose own or nearest other rider is named, lowest first; a `ride_rider` answer fixes that ride and changes neighbours' assignments; low-evidence rides are capped and queued; rides within `lighting_change_window_s` of a lighting change get lower confidence
-- [ ] T024 [US2] Implement assignment, confidence and queue in src/surfclip/riders/assign.py (R5, R4 lighting change); re-cluster with all constraints after each answer (≤ 2 s for 100 rides); until T023 passes
-- [ ] T025 [US2] Queue panel in web/src/routes/Riders.svelte: one ride at a time (playable) beside the candidate rider's stills; "yes, it's X" / "no, it's…" (pick another rider or "someone else"); remaining count; keyboard shortcuts
-- [ ] T026 [US2] Mark unconfirmed rides in exports and the Review list (FR-005 acceptance 3)
+- [x] T024 [US2] Implement assignment, confidence and queue in src/surfclip/riders/assign.py (R5, R4 lighting change); re-cluster with all constraints after each answer (≤ 2 s for 100 rides); until T023 passes
+- [x] T025 [US2] Queue panel in web/src/routes/Riders.svelte: one ride at a time (playable) beside the candidate rider's stills; "yes, it's X" / "no, it's…" (pick another rider or "someone else"); remaining count; keyboard shortcuts
+- [x] T026 [US2] Mark unconfirmed rides in exports and the Review list (FR-005 acceptance 3)
 
 ---
 
@@ -105,10 +105,10 @@ session (SC-002 ≤ 10)
 
 **Independent Test**: name and confirm, re-run with another min length, check labels (SC-005)
 
-- [ ] T027 [P] [US3] Integration test in tests/integration/test_riders_rerun.py: name riders and confirm rides on a processed fixture session, re-run rides with `rides.min_length_s` changed, assert every surviving ride keeps its rider and new rides are assigned; splitting a ride keeps the rider on both parts; merging rides of different riders queues the result
+- [x] T027 [P] [US3] Integration test in tests/integration/test_riders_rerun.py: name riders and confirm rides on a processed fixture session, re-run rides with `rides.min_length_s` changed, assert every surviving ride keeps its rider and new rides are assigned; splitting a ride keeps the rider on both parts; merging rides of different riders queues the result
 - [x] T028 [P] [US3] Unit tests for joins in tests/unit/test_rider_assign.py: consecutive rides of one rider, first ending at a frame edge and second starting off-frame, gap ≤ `join_gap_s`, both ≥ `join_confidence` → auto join; otherwise a suggestion; an undone auto join (`rider_unjoin`) is never repeated
 - [x] T029 [US3] Implement frame-edge joins in src/surfclip/riders/assign.py and src/surfclip/stages.py (R7): auto joins written to auto_joins.json by the riders stage (stages never write edits; constitution VI) and applied when rides.json is rebuilt; `rider_unjoin` edits win; suggestions in riders.json; `POST /sessions/{id}/joins` in src/surfclip/api/app.py; suggestions with one-click join in web/src/routes/Riders.svelte; until T028 passes
-- [ ] T030 [US3] Rider behaviour on ride edits in src/surfclip/riders/edits.py: split parts inherit the rider (confirmed if the original was); a merge of rides of different riders is unconfirmed and queued; hand-added rides are described from their time span's person if found, else unassigned and queued
+- [x] T030 [US3] Rider behaviour on ride edits in src/surfclip/riders/edits.py: split parts inherit the rider (confirmed if the original was); a merge of rides of different riders is unconfirmed and queued; hand-added rides are described from their time span's person if found, else unassigned and queued
 
 ---
 
@@ -125,7 +125,7 @@ session (SC-002 ≤ 10)
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T033 Evaluation report: run `surfclip eval riders` on all five sessions (PXL held out), record SC-001/SC-002 per session and the riders-stage time per hour (SC-006) in specs/002-rider-identification/eval-log.md
+- [x] T033 Evaluation report: run `surfclip eval riders` on all five sessions (PXL held out), record SC-001/SC-002 per session and the riders-stage time per hour (SC-006) in specs/002-rider-identification/eval-log.md
 - [ ] T034 [P] Measure the user's hands-on time for naming + queue on one 1 h session (SC-003) and "rides found → my reel" time (SC-004); record in eval-log.md
 - [ ] T035 [P] Privacy check: appearance.parquet and riders.json are only read for their own session (grep/test), no network calls during the riders stage, no face crops stored separately
 - [ ] T036 Update specs/001-ride-detection-clipping/contracts and specs/002-rider-identification/quickstart.md with any changes found while implementing; run every quickstart scenario

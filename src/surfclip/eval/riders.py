@@ -136,6 +136,7 @@ class RiderMetrics:
     correct: int  # in their true rider's group (one-to-one majority mapping)
     true_riders: int
     groups: int
+    corrections: int = 0  # SC-002: same-as merges + single-ride moves for the named riders
 
     @property
     def accuracy(self) -> float:  # SC-001
@@ -145,6 +146,7 @@ class RiderMetrics:
 def evaluate_riders(labels: RiderLabels, detected: Rides, riders: Riders) -> RiderMetrics:
     group_of = {r: g.rider_id for g in riders.riders for r in g.ride_ids}
     pairs: list[tuple[str, str]] = []
+    rows: list[tuple[str, str, str]] = []  # ride, true rider, card
     unmatched = 0
     for lab in labels.rides:
         best = max(
@@ -160,12 +162,36 @@ def evaluate_riders(labels: RiderLabels, detected: Rides, riders: Riders) -> Rid
             unmatched += 1
             continue
         pairs.append((lab.rider, group_of[best.ride_id]))
+        rows.append((best.ride_id, lab.rider, group_of[best.ride_id]))
     true = sorted({t for t, _ in pairs})
     pred = sorted({p for _, p in pairs})
     counts = Counter(pairs)
     table = np.array([[counts[(t, p)] for p in pred] for t in true], dtype=np.float64)
     correct = 0
     if table.size:
-        rows, cols = optimize.linear_sum_assignment(-table)  # one group per true rider, most rides
-        correct = int(table[rows, cols].sum())
-    return RiderMetrics(len(pairs), unmatched, correct, len(true), len(pred))
+        ri, ci = optimize.linear_sum_assignment(-table)  # one group per true rider, most rides
+        correct = int(table[ri, ci].sum())
+    named = [n for n in labels.named if n in true]
+    return RiderMetrics(
+        len(pairs), unmatched, correct, len(true), len(pred), corrections(rows, named)
+    )
+
+
+def corrections(rows: list[tuple[str, str, str]], named: list[str]) -> int:
+    """Actions needed to make every named rider's card exactly right with the Riders screen:
+    one same-as per extra card holding only that rider, one move per stray ride."""
+    merges = 0
+    moved: set[str] = set()
+    for who in named:
+        cards = Counter(card for _, t, card in rows if t == who)
+        main = cards.most_common(1)[0][0]
+        for card in cards:
+            if card == main:
+                continue
+            inside = [(r, t) for r, t, c in rows if c == card]
+            if all(t == who for _, t in inside):
+                merges += 1
+            else:
+                moved |= {r for r, t in inside if t == who}
+        moved |= {r for r, t, c in rows if c == main and t != who}
+    return merges + len(moved)

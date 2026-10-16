@@ -129,6 +129,17 @@
       busy = false
     }
   }
+  // Review queue (US2): rides that may or may not belong to a named rider, least sure first.
+  // Answers only ever confirm or move that one ride.
+  let queueOpen = $state(false)
+  const cardOf = $derived(new Map((info?.riders ?? []).flatMap((g) => g.ride_ids.map((r) => [r, g] as const))))
+  const queued = $derived(
+    (info?.assignments ?? []).filter((a) => a.queued && !a.confirmed).sort((a, b) => a.confidence - b.confidence),
+  )
+  function confirmRide(rideId: string) {
+    const g = cardOf.get(rideId)
+    if (g) void act({ op: 'ride_rider', ride_id: rideId, to_rider_id: g.rider_id }, () => `confirmed ${g.label}`)
+  }
   let exportJob = $state<Job | null>(null)
   async function exportAll() {
     try {
@@ -224,6 +235,33 @@
     </section>
 
     <section class="cards">
+      {#if queued.length}
+        <div class="card wide queue">
+          <div class="head">
+            <strong>Check {queued.length} uncertain ride{queued.length === 1 ? '' : 's'}</strong>
+            <span class="muted small">the tool is not sure these belong to the rider shown</span>
+            <button class="link" onclick={() => (queueOpen = !queueOpen)}>{queueOpen ? 'close' : 'open'}</button>
+          </div>
+          {#if queueOpen}
+            {#each queued.slice(0, 8) as a (a.ride_id)}
+              {@const g = cardOf.get(a.ride_id)}
+              <div class="row">
+                <button class="still" onclick={() => play(a.ride_id)} title="Play this ride"><img alt="" src={still(a.ride_id)} /></button>
+                <span class="small">{byId.get(a.ride_id) ? clock(byId.get(a.ride_id)!.start_s) : ''}</span>
+                <button onclick={() => confirmRide(a.ride_id)} disabled={busy}>yes, {g?.label}</button>
+                <select disabled={busy} onchange={(e) => move(a.ride_id, e.currentTarget)}>
+                  <option value="">no, it's…</option>
+                  {#each active.filter((o) => o.rider_id !== g?.rider_id) as o (o.rider_id)}
+                    <option value={o.rider_id}>{o.label}</option>
+                  {/each}
+                  <option value="__new">a new rider…</option>
+                </select>
+              </div>
+            {/each}
+            {#if queued.length > 8}<p class="small muted">{queued.length - 8} more after these</p>{/if}
+          {/if}
+        </div>
+      {/if}
       {#if info.join_suggestions.length}
         <div class="card wide joins">
           <strong>Possibly one ride split in two</strong>

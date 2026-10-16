@@ -502,7 +502,9 @@ def eval_riders_cmd(
         f"  target >= 85%\n"
         f"riders      {m.true_riders} labelled, {m.groups} groups"
         f" (cut {cfg.riders.cluster_threshold}, descriptor {cfg.riders.descriptor})\n"
-        f"not scored  {m.unmatched} labelled rides without a detected ride"
+        f"not scored  {m.unmatched} labelled rides without a detected ride\n"
+        f"effort      {m.corrections} corrections to get the named riders exactly right"
+        f"  target <= 10"
     )
 
 

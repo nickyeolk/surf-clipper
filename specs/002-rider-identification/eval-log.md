@@ -29,3 +29,20 @@ pair is a true split). `scripts/join_eval.py`, 001 ride metrics on the detected 
 | --- | --- | --- | --- | --- |
 | 20260928_IMG_1652 (portrait) | 3 | 96.2% -> 100% | 91.1% -> 100% | 79.2% -> 84.9% |
 | other four labelled sessions | 0 (1 suggestion on night HDR) | unchanged | unchanged | unchanged |
+## 2026-10-16 - review queue and correction effort (US2, SC-002)
+
+SC-002 is counted as the user works now: one same-as per extra card holding only that rider,
+one move per stray ride, for the riders named in the labels (`surfclip eval-riders`):
+
+| Session | SC-001 | Corrections |
+| --- | --- | --- |
+| 20240924 (all 8 riders named) | 79.7% | 16 |
+| 20241004 | 93.3% | 4 |
+| 20260928_IMG_1652 | 100% | 0 |
+| 20261012_110549566 (night HDR) | 58.0% | 66 |
+| PXL_20261014_100546073 (held out) | 92.2% | 5 |
+| 20250206 (new; the user actually made 4 merges) | 96.3% | 4 |
+
+Queue ("is this you?", suggestion only): on the user's current cards it lists 5 (20241004),
+9 (20250206) and 33 (night HDR) rides; on the night session the 3 rides still wrong in named
+cards are all in it, first (confidence 0.00; AUC of confidence for wrong vs right 0.99).

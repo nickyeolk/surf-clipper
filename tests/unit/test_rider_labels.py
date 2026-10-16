@@ -72,3 +72,4 @@ def test_grouping_accuracy_uses_one_group_per_rider() -> None:
     m = evaluate_riders(labels, DETECTED, RIDERS)
     assert (m.labelled, m.correct, m.true_riders, m.groups) == (6, 5, 2, 3)
     assert m.accuracy == pytest.approx(5 / 6)
+    assert m.corrections == 1  # "me" needs one same-as (r5's card holds only "me")
