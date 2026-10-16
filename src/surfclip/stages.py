@@ -311,6 +311,28 @@ class RidersStage(Stage):
         return ["appearance.parquet", "riders.json"]
 
 
+@dataclass
+class AnalysisStage(Stage):
+    """Keypoints and measures for the rides of named riders (feature 004). Not part of a
+    session's first processing: it runs when the user asks (riders must be named first)."""
+
+    name: StageName = "analysis"
+    depends_on: tuple[StageName, ...] = ("riders",)
+    config_sections: tuple[str, ...] = ("analysis_pose", "zone")
+    code_version: str = field(default_factory=lambda: source_version("analysis/*.py"))
+    cpu: bool = False
+
+    def extra_inputs(self, store: SessionStore) -> list[str]:
+        # Rider names and analysis corrections live in edits; per-ride caching keeps it cheap.
+        return [f"edits:{read_edits(store).model_dump_json()}"]
+
+    def run(self, ctx: StageContext) -> list[str]:
+        from surfclip.analysis.service import ANALYSIS_FILE, analyse_session
+
+        analyse_session(ctx.store, ctx.config, cpu=self.cpu, progress=ctx.progress)
+        return [ANALYSIS_FILE]
+
+
 def default_pipeline(*, cpu: bool = False) -> Pipeline:
     return Pipeline(
         [
@@ -320,5 +342,6 @@ def default_pipeline(*, cpu: bool = False) -> Pipeline:
             TrackStage(),
             RidesStage(),
             RidersStage(),
+            AnalysisStage(cpu=cpu),
         ]
     )

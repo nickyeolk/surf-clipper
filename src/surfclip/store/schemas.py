@@ -28,6 +28,7 @@ StageName = Literal[
     "refine",
     "apply_edits",
     "riders",
+    "analysis",
     "export",
 ]
 
@@ -256,6 +257,11 @@ EditOp = Literal[
     "rider_ignore",
     "ride_rider",
     "rider_unjoin",
+    # 004: analysis corrections and trick tags, anchored to rides by span
+    "ride_ending",
+    "turn_add",
+    "turn_remove",
+    "trick_tag",
 ]
 
 
@@ -374,3 +380,57 @@ class Still(_Model):
 
 class Stills(_Versioned):
     stills: list[Still] = Field(default_factory=list[Still])
+
+
+# --- 004: analysis.json ---------------------------------------------------------------------
+
+Ending = Literal["fall", "exit", "unclear"]
+
+
+class AnalysisEvent(_Model):
+    t: float
+    depth: float | None = None  # compression at the event (1 = ride median)
+    side: str | None = None
+    name: str | None = None  # trick tags
+    by: Literal["auto", "user"] = "auto"
+
+
+class RideShares(_Model):
+    turning: float = 0.0
+    pumping: float = 0.0
+    trimming: float = 0.0
+    unclear: float = 0.0
+
+
+class RideSummary(_Model):
+    length_s: float
+    turns: int = 0
+    pumps: int = 0
+    turn_rate_per_10s: float = 0.0
+    rhythm_cv: float | None = None
+    mean_depth: float | None = None
+
+
+class RideAnalysis(_Model):
+    ride_id: str
+    span: tuple[float, float]
+    rider: str
+    cache_key: str
+    keypoints_key: str  # the part of the key the keypoints depend on (span + pose settings)
+    fps: float
+    t0: float  # time of the first analysed frame
+    compression: list[float | None] = Field(default_factory=list[float | None])
+    lateral: list[float | None] = Field(default_factory=list[float | None])
+    turns: list[AnalysisEvent] = Field(default_factory=list[AnalysisEvent])
+    pumps: list[AnalysisEvent] = Field(default_factory=list[AnalysisEvent])
+    shares: RideShares = Field(default_factory=RideShares)
+    ending: Ending = "unclear"
+    ending_auto: Ending = "unclear"
+    summary: RideSummary
+    tricks: list[AnalysisEvent] = Field(default_factory=list[AnalysisEvent])  # user trick tags
+
+
+class AnalysisFile(_Versioned):
+    session_id: str
+    settings: dict[str, object] = Field(default_factory=dict[str, object])
+    rides: list[RideAnalysis] = Field(default_factory=list[RideAnalysis])

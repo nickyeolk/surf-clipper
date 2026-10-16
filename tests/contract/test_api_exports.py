@@ -28,7 +28,7 @@ def test_health_reports_gpu_encoder_and_models(client: TestClient) -> None:
     body = client.get("/api/health").json()
     assert body["ok"] is True and body["gpu"] is True
     assert body["encoder"] == "cpu"  # NVENC test failed
-    assert set(body["models"]) == {"detector", "embedder"}
+    assert set(body["models"]) == {"detector", "embedder", "pose"}
     assert body["models"]["embedder"] is False  # empty torch hub
 
 

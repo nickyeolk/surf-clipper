@@ -21,6 +21,7 @@ from surfclip.config import Config
 class Models(BaseModel):
     detector: bool
     embedder: bool
+    pose: bool
 
 
 class Health(BaseModel):
@@ -68,6 +69,7 @@ def models(cfg: Config) -> Models:
     )
     return Models(
         detector=Path(cfg.detect.model).is_file(),
+        pose=Path(cfg.analysis_pose.model).is_file(),
         embedder=embedder or cfg.riders.descriptor == "colour",
     )
 

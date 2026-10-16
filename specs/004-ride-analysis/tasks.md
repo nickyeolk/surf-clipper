@@ -19,25 +19,25 @@ while the signals are built; signal choice (R3) and thresholds are decided on th
 
 ## Phase 1: Setup
 
-- [ ] T001 Add `[analysis_pose]` to config/default.toml and `AnalysisPoseConfig` in src/surfclip/config.py (data-model.md "Config"); add the pose weights to `models download` and `/api/health` models
-- [ ] T002 [P] Schemas in src/surfclip/store/schemas.py: `RideAnalysis`, `AnalysisEvent`, `AnalysisFile`, `AnalysisMarks`; `EditOp` += `ride_ending`, `turn_add`, `turn_remove`, `trick_tag`; `StageName` += `analysis`
+- [x] T001 Add `[analysis_pose]` to config/default.toml and `AnalysisPoseConfig` in src/surfclip/config.py (data-model.md "Config"); add the pose weights to `models download` and `/api/health` models
+- [x] T002 [P] Schemas in src/surfclip/store/schemas.py: `RideAnalysis`, `AnalysisEvent`, `AnalysisFile`, `AnalysisMarks`; `EditOp` += `ride_ending`, `turn_add`, `turn_remove`, `trick_tag`; `StageName` += `analysis`
 
 ## Phase 2: Foundational (marks for evaluation, keypoints)
 
-- [ ] T003 [P] Marks: src/surfclip/analysis/marks.py (work from named riders' rides, save/finalize `labels/analysis/<video>.json`, re-attach by span) and routes `GET/PUT /sessions/{id}/marks`, `POST .../marks/finalize`; contract tests
-- [ ] T004 Marks screen web/src/routes/Marks.svelte (`#/marks/<id>`): your rides in order, review-copy player at 0.5x default, `t` turn at playhead, `p` pump, `f`/`e`/`u` ending, list of marks per ride with delete, progress, finalize; link from Sessions
-- [ ] T005 Keypoint extraction src/surfclip/analysis/pose.py: decode the ride span at `fps` from the source (tone-mapped like the review copy), interpolate the ride's track boxes, crop with margin, YOLO-pose (batched), pick the person nearest the crop centre, `other_iou` against other tracks; write `analysis/<ride>.parquet`; unit test the box interpolation and person picking on synthetic data
-- [ ] T006 `AnalysisStage` in src/surfclip/stages.py + src/surfclip/analysis/service.py: named riders' rides only (riders.json names), per-ride cache key, reuse unchanged rides, drop rides no longer named; `surfclip analyse`; `POST /sessions/{id}/analysis` job
+- [x] T003 [P] Marks: src/surfclip/analysis/marks.py (work from named riders' rides, save/finalize `labels/analysis/<video>.json`, re-attach by span) and routes `GET/PUT /sessions/{id}/marks`, `POST .../marks/finalize`; contract tests
+- [x] T004 Marks screen web/src/routes/Marks.svelte (`#/marks/<id>`): your rides in order, review-copy player at 0.5x default, `t` turn at playhead, `p` pump, `f`/`e`/`u` ending, list of marks per ride with delete, progress, finalize; link from Sessions
+- [x] T005 Keypoint extraction src/surfclip/analysis/pose.py: decode the ride span at `fps` from the source (tone-mapped like the review copy), interpolate the ride's track boxes, crop with margin, YOLO-pose (batched), pick the person nearest the crop centre, `other_iou` against other tracks; write `analysis/<ride>.parquet`; unit test the box interpolation and person picking on synthetic data
+- [x] T006 `AnalysisStage` in src/surfclip/stages.py + src/surfclip/analysis/service.py: named riders' rides only (riders.json names), per-ride cache key, reuse unchanged rides, drop rides no longer named; `surfclip analyse`; `POST /sessions/{id}/analysis` job
 
 **Checkpoint**: the user marks ≥ 10 of their rides on PXL and 20241004 (and later a third,
 held-out session) while US1 is built.
 
 ## Phase 3: US1 - See how I move on each ride (P1) 🎯 MVP
 
-- [ ] T007 [P] [US1] Unit tests tests/unit/test_analysis_signals.py: each R3 signal is invariant to uniform scaling of keypoints (zoom) and to mirroring; unclear frames → null; smoothing keeps a 0.5 s dip
-- [ ] T008 [P] [US1] Unit tests tests/unit/test_analysis_events.py: synthetic compression + lateral signals with known turns/pumps → detected within 0.2 s; trimming share; endings for synthetic fall (collapse in the face band) vs exit (track ends at a side wall upright)
-- [ ] T009 [US1] src/surfclip/analysis/signals.py: the three R3 compression signals, lateral pool `u` (zone + epochs; null on handheld spans), torso rotation, unclear mask
-- [ ] T010 [US1] src/surfclip/analysis/events.py: turns, pumps, trimming, shares, endings (R4, R5); summary incl. `rhythm_cv`
+- [x] T007 [P] [US1] Unit tests tests/unit/test_analysis_signals.py: each R3 signal is invariant to uniform scaling of keypoints (zoom) and to mirroring; unclear frames → null; smoothing keeps a 0.5 s dip
+- [x] T008 [P] [US1] Unit tests tests/unit/test_analysis_events.py: synthetic compression + lateral signals with known turns/pumps → detected within 0.2 s; trimming share; endings for synthetic fall (collapse in the face band) vs exit (track ends at a side wall upright)
+- [x] T009 [US1] src/surfclip/analysis/signals.py: the three R3 compression signals, lateral pool `u` (zone + epochs; null on handheld spans), torso rotation, unclear mask
+- [x] T010 [US1] src/surfclip/analysis/events.py: turns, pumps, trimming, shares, endings (R4, R5); summary incl. `rhythm_cv`
 - [ ] T011 [US1] src/surfclip/analysis/marks.py `eval-analysis`: SC-001 (turn precision/recall within 0.5 s), SC-002 (ending accuracy), SC-003 (share error vs marked pumps/turn windows); CLI `surfclip eval-analysis`
 - [ ] T012 [US1] Choose the R3 signal and tune thresholds on the marked sessions except the held-out one; record "R3 results" in research.md and eval-log.md; set config defaults
 - [ ] T013 [US1] Analysis edits (`ride_ending`, `turn_add`, `turn_remove`) applied after the stage output in service.py, re-attached by span; `POST /sessions/{id}/analysis-edits`; `GET /sessions/{id}/analysis`, keypoints route scaled to review-copy pixels; contract tests tests/contract/test_api_analysis.py

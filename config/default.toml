@@ -4,7 +4,7 @@
 # "_px_at_720p" (a detector-input size, normalised to a 720p frame).
 # Bump config_version whenever a default changes (informational). Stage cache keys use only the
 # sections each stage reads, so changing a ride threshold never re-runs detection.
-config_version = 5
+config_version = 6
 
 [analysis]
 fps = 5                       # analysis proxy frame rate
@@ -86,6 +86,23 @@ pad_before_s = 1.5            # 1.5/2.0 chosen by scripts/pad_sweep.py (2026-10-
 pad_after_s = 2.0
 refine_window_s = 2.0
 changeover_overlap_max_s = 3.0
+
+[analysis_pose]                # 004 ride analysis (named riders only)
+fps = 15                      # keypoint rate
+model = "artifacts/models/yolo11s-pose.pt"   # s and x agreed closely in the spike (R1)
+imgsz = 384                   # pose input size for the rider crop
+batch = 16
+crop_margin = 0.3             # crop = track box grown by this fraction of its height
+min_conf = 0.3                # keypoints below this are not used
+smooth_s = 0.3                # Savitzky-Golay window for the compression signal
+signal = "leg_torso"          # leg_torso | leg_straightness (R3; chosen on the marks)
+turn_speed_pool_per_s = 0.05  # lateral speed (pool units/s) on both sides of a direction change
+turn_window_s = 0.7           # a turn's compression minimum within this of the direction change
+pump_depth = 0.85             # compression minimum below this (1 = ride median) is a pump/turn
+fall_window_s = 1.5           # the end of the ride examined for a fall
+fall_depth = 0.6              # compression below this at the end (with no exit) = fall
+compare_window_s = [3.0, 0.5] # fall comparison: from end-3 s to end-0.5 s
+other_iou_max = 0.3           # crop overlapping another person more than this = unclear
 
 [riders]
 crops_per_ride = 12           # moments sampled per ride (crops of the ride's tracked person)

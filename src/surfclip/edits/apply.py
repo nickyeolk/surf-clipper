@@ -24,6 +24,7 @@ REATTACH_IOU = 0.5
 RIDER_OPS = frozenset(
     {"rider_name", "rider_same_as", "rider_mixed", "rider_ignore", "ride_rider", "rider_unjoin"}
 )
+ANALYSIS_OPS = frozenset({"ride_ending", "turn_add", "turn_remove", "trick_tag"})  # 004
 
 
 def _num(edit: UserEdit, key: str) -> float:
@@ -110,7 +111,12 @@ def apply_edits(detected: Rides, edits: Edits) -> Rides:
     rides: dict[str, Ride] = {r.ride_id: r for r in detected.rides}
     undone = undone_ids(edits)
     for edit in edits.edits:
-        if edit.op in ("confirm_zone", "undo") or edit.op in RIDER_OPS or edit.edit_id in undone:
+        if (
+            edit.op in ("confirm_zone", "undo")
+            or edit.op in RIDER_OPS
+            or edit.op in ANALYSIS_OPS
+            or edit.edit_id in undone
+        ):
             continue
         if edit.op == "add":
             rid = f"u{edit.edit_id:04d}"

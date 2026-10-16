@@ -180,6 +180,8 @@
                   <a class="button" href={`#/riders/${s.session_id}`}>Riders</a>
                   <a class="button secondary" href={`#/viewer/${s.session_id}`}
                     title="Watch exported clips and compilations at full quality; saved stills">Exports</a>
+                  <a class="button secondary" href={`#/marks/${s.session_id}`}
+                    title="Mark turns and endings on your rides (to check the ride analysis)">Mark rides</a>
                   <a class="button secondary" href={`#/label/${s.session_id}`}>Label</a>
                   {#if s.labels_final}
                     <a class="button secondary" href={`#/rider-labels/${s.session_id}`}

@@ -31,13 +31,14 @@ Candidates, each smoothed (Savitzky-Golay, ~0.3 s) and normalised by its own rid
 
 1. **Leg/torso**: |mid-hip → mid-ankle| / |mid-shoulder → mid-hip|. Zoom-invariant; torso
    foreshortens when leaning toward the camera.
-2. **Height/torso**: |mid-shoulder → mid-ankle| / torso length measured in upright frames
-   (frames where the knee angle is open and the torso near the leg axis): a per-ride body scale.
-3. **Height / expected height**: shoulder-ankle length over the standing height expected at the
-   rider's pool position (fit of box height vs image position over the ride's upright frames,
-   as 001's horizon fit). Uses the zone; fails on handheld spans.
+2. **Leg straightness**: |mid-hip → mid-ankle| / (hip→knee + knee→ankle), averaged over both
+   legs: 1 = straight; unaffected by torso lean (2026-10-17: replaces "height/torso", which in
+   one frame reduces to 1 + leg/torso).
+3. **Height / expected height** (not implemented): shoulder-ankle length over the standing
+   height expected at the rider's pool position. Needs the zone and fails on handheld spans;
+   built only if 1 and 2 both miss SC-001.
 
-**Decision**: implement all three in `signals.py`; choose by SC-001 (turns within 0.5 s) on the
+**Decision**: implement 1 and 2 in `signals.py`; choose by SC-001 (turns within 0.5 s) on the
 marked rides, held-out session excluded. Record in "R3 results".
 
 ## R4. Turns, pumps, trimming
@@ -49,7 +50,7 @@ marked rides, held-out session excluded. Record in "R3 results".
 - **Turn**: a direction change of lateral velocity (sign change with speed above a threshold on
   both sides) within ±0.7 s of a compression minimum; time = the compression minimum.
 - **Pump**: a compression minimum deeper than a threshold without a direction change.
-- **Trimming**: time not within any turn or pump window and with small compression variance.
+- **Trimming**: clear riding time not within any turn (±0.6 s) or pump (±0.4 s) window.
 - **Unclear**: frames with hip/ankle confidence below 0.3 or the crop overlapping another person
   (IoU > 0.3 with another track): excluded from measures and shares.
 

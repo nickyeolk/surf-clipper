@@ -57,6 +57,7 @@ Tags are deleted with the existing `undo`.
 ## Config `[analysis_pose]`
 
 `fps = 15`, `model = "artifacts/models/yolo11s-pose.pt"`, `imgsz = 384`, `crop_margin = 0.3`,
-`min_conf = 0.3`, `smooth_s = 0.3`, `signal = "leg_torso"` (R3), `turn_speed_pool_per_s`,
-`turn_window_s = 0.7`, `pump_depth = 0.85`, `trim_var`, `fall_window_s = 1.5`,
+`min_conf = 0.3`, `smooth_s = 0.3`, `signal = "leg_torso" | "leg_straightness"` (R3),
+`turn_speed_pool_per_s`,
+`turn_window_s = 0.7`, `pump_depth = 0.85`, `fall_window_s = 1.5`,
 `fall_depth = 0.6`, `compare_window_s = [3.0, 0.5]`, `other_iou_max = 0.3`.

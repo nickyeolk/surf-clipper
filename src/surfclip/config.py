@@ -103,6 +103,24 @@ class RidesConfig(_Section):
     changeover_overlap_max_s: float
 
 
+class AnalysisPoseConfig(_Section):
+    fps: float
+    model: str
+    imgsz: int
+    batch: int
+    crop_margin: float
+    min_conf: float
+    smooth_s: float
+    signal: Literal["leg_torso", "leg_straightness"]
+    turn_speed_pool_per_s: float
+    turn_window_s: float
+    pump_depth: float
+    fall_window_s: float
+    fall_depth: float
+    compare_window_s: tuple[float, float]
+    other_iou_max: float
+
+
 class RidersConfig(_Section):
     crops_per_ride: int
     keep_sharpest: int
@@ -168,6 +186,7 @@ class Config(_Section):
     zone: ZoneConfig
     rides: RidesConfig
     riders: RidersConfig
+    analysis_pose: AnalysisPoseConfig
     export: ExportConfig
     compilation: CompilationConfig
     review: ReviewConfig

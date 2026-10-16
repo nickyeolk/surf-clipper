@@ -291,6 +291,30 @@ def export(
     )
 
 
+@app.command("analyse-rides")
+def analyse_rides(
+    video: Path,
+    artifacts: ArtifactsOpt = Path("artifacts"),
+    config: ConfigOpt = DEFAULT_CONFIG_PATH,
+    cpu: CpuOpt = False,
+    timings: Annotated[bool, typer.Option("--timings")] = False,
+) -> None:
+    """Analyse the rides of named riders: keypoints, compression, turns, pumps, endings."""
+    from surfclip.analysis.service import read_analysis
+
+    store = _run(video, "analysis", artifacts, config, cpu, timings)
+    result = read_analysis(store)
+    if result is None or not result.rides:
+        typer.echo("no rides analysed: name a rider first (`surfclip riders name`)")
+        return
+    for a in result.rides:
+        s = a.summary
+        typer.echo(
+            f"  {a.ride_id}  {a.rider:10s} {s.length_s:5.1f}s  turns {s.turns:2d}  pumps "
+            f"{s.pumps:2d}  turning {a.shares.turning:4.0%}  ending {a.ending}"
+        )
+
+
 @app.command()
 def still(
     video: Path,
@@ -369,6 +393,9 @@ def models_download(config: ConfigOpt = DEFAULT_CONFIG_PATH) -> None:
     cfg = load_config(config)
     path = download_model(cfg.detect)
     typer.echo(f"detector weights at {path}")
+    from surfclip.analysis.pose import download_pose
+
+    typer.echo(f"pose weights at {download_pose(cfg.analysis_pose)}")
     if cfg.riders.descriptor != "colour":
         typer.echo(f"rider embedding model at {download_embedder()}")
 
