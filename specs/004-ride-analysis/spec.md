@@ -179,6 +179,13 @@ played back to back.
 - **SC-005**: The skeleton overlay keeps up with playback at 1x on the laptop.
 - **SC-006**: From "rides named" to "see the fall comparison" takes the user at most 2 minutes.
 
+## Future directions (not in this feature)
+
+- Compare different surfers on the same trick: tagged tricks of two named riders side by side,
+  synchronised on the trick moment, with their compression and body-proportion curves overlaid.
+  Builds on FR-008 tags and works for any rider the user names (FR-010).
+- Automatic trick recognition, trained on the user's trick tags.
+
 ## Assumptions
 
 - Evaluation labels: the user marks turns and endings on at least 10 of their rides (about 5
