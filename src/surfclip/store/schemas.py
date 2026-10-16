@@ -147,6 +147,7 @@ class RideFlags(_Model):
     truncated: bool = False
     user_edited: bool = False
     user_added: bool = False
+    joined: bool = False  # 002: two rides split at the frame edge, joined automatically
 
 
 class ExportRecord(_Model):
@@ -318,3 +319,13 @@ class Riders(_Versioned):
     assignments: list[RideAssignment]
     join_suggestions: list[JoinSuggestion] = Field(default_factory=list[JoinSuggestion])
     auto_joined: list[tuple[str, str]] = Field(default_factory=list[tuple[str, str]])
+
+
+RideRef = tuple[str, float, float]  # ride id, start s, end s (re-attached by time overlap)
+
+
+class AutoJoins(_Versioned):
+    """Rides split at the frame edge that the riders stage joined (002, research R7). A stage
+    output, not an edit: rides.json applies them; the user's ``rider_unjoin`` edits win."""
+
+    joins: list[tuple[RideRef, RideRef]] = Field(default_factory=list[tuple[RideRef, RideRef]])

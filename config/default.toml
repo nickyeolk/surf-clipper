@@ -98,7 +98,8 @@ cluster_threshold = 0.075     # grouping cut (cosine distance of embeddings); T0
 queue_below = 0.5             # rides less confident than this go to the review queue
 stills = 6                    # stills shown per rider
 join_gap_s = 6.0              # join rides split at a frame edge when the gap is at most this
-join_confidence = 0.8         # ...and both halves are at least this confident
+join_confidence = 0.4         # ...and both halves are at least this confident (portrait: the
+                              # 3 true splits are same-card pairs at 0.44-0.66; none other is)
 lighting_change_window_s = 30.0  # rides this close to a lighting change get lower confidence
 
 [export]

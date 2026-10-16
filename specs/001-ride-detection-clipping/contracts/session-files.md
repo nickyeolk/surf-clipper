@@ -42,7 +42,8 @@ artifacts/<session_id>/
       "track_ids": [17],
       "start_kind": "acid_drop",
       "state_timeline": [[148.9, "dropping_in"], [150.4, "on_wave"], [171.9, "off"]],
-      "flags": {"lesson": false, "truncated": true, "user_edited": false, "user_added": false},
+      "flags": {"lesson": false, "truncated": true, "user_edited": false, "user_added": false,
+                "joined": false},
       "export": null
     }
   ],

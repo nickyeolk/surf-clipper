@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 
-from surfclip.store.schemas import Edits, Ride, RideFlags, Rides, UserEdit
+from surfclip.store.schemas import Edits, Ride, RideFlags, RideRef, Rides, UserEdit
 
 log = logging.getLogger(__name__)
 
@@ -159,23 +159,66 @@ def apply_edits(detected: Rides, edits: Edits) -> Rides:
                     update={"ride_id": r.ride_id + suffix, "flags": flags}
                 )
         elif edit.op == "merge":
-            parts = [rides.pop(i) for i in found]
-            first = min(parts, key=lambda p: p.start_s)
-            merged = _respan(
-                first, min(p.start_s for p in parts), max(p.end_s for p in parts), fps, detected
-            )
-            rides[first.ride_id] = merged.model_copy(
-                update={
-                    "track_ids": sorted({t for p in parts for t in p.track_ids}),
-                    "epochs": sorted({e for p in parts for e in p.epochs}),
-                    "flags": first.flags.model_copy(
-                        update={
-                            "user_edited": True,
-                            "lesson": any(p.flags.lesson for p in parts),
-                            "truncated": any(p.flags.truncated for p in parts),
-                        }
-                    ),
-                }
-            )
+            merged = _merge([rides.pop(i) for i in found], fps, detected, user=True)
+            rides[merged.ride_id] = merged
     ordered = sorted(rides.values(), key=lambda r: r.start_s)
     return detected.model_copy(update={"rides": ordered})
+
+
+def _merge(parts: list[Ride], fps: float, rides: Rides, *, user: bool) -> Ride:
+    first = min(parts, key=lambda p: p.start_s)
+    merged = _respan(first, min(p.start_s for p in parts), max(p.end_s for p in parts), fps, rides)
+    flags = {
+        "lesson": any(p.flags.lesson for p in parts),
+        "truncated": any(p.flags.truncated for p in parts),
+        **({"user_edited": True} if user else {"joined": True}),
+    }
+    return merged.model_copy(
+        update={
+            "track_ids": sorted({t for p in parts for t in p.track_ids}),
+            "epochs": sorted({e for p in parts for e in p.epochs}),
+            "flags": first.flags.model_copy(update=flags),
+        }
+    )
+
+
+def unjoined_pairs(edits: Edits) -> list[tuple[RideRef, RideRef]]:
+    """Joins the user undid (``rider_unjoin`` edits still in effect)."""
+    undone = undone_ids(edits)
+    out: list[tuple[RideRef, RideRef]] = []
+    for e in edits.edits:
+        if e.op == "rider_unjoin" and e.edit_id not in undone:
+            a, b = _ref(e.payload.get("first")), _ref(e.payload.get("second"))
+            if a is not None and b is not None:
+                out.append((a, b))
+    return out
+
+
+def _ref(value: object) -> RideRef | None:
+    if isinstance(value, list | tuple) and len(value) == 3:  # pyright: ignore[reportUnknownArgumentType]
+        rid, s, e = value  # pyright: ignore[reportUnknownVariableType]
+        return (str(rid), float(s), float(e))  # pyright: ignore[reportUnknownArgumentType]
+    return None
+
+
+def same_pair(a: tuple[RideRef, RideRef], b: tuple[RideRef, RideRef]) -> bool:
+    """The same two rides (by time overlap), whatever their ids now."""
+    return all(iou((x[1], x[2]), (y[1], y[2])) >= REATTACH_IOU for x, y in zip(a, b, strict=True))
+
+
+def apply_joins(
+    rides: Rides, joins: list[tuple[RideRef, RideRef]], unjoined: list[tuple[RideRef, RideRef]]
+) -> Rides:
+    """Join rides split at the frame edge (002), except pairs the user unjoined."""
+    by_id = {r.ride_id: r for r in rides.rides}
+    for pair in joins:
+        if any(same_pair(pair, u) for u in unjoined):
+            continue
+        a = resolve_ride(pair[0][0], (pair[0][1], pair[0][2]), by_id)
+        b = resolve_ride(pair[1][0], (pair[1][1], pair[1][2]), by_id)
+        if a is None or b is None or a == b:
+            continue
+        merged = _merge([by_id.pop(a), by_id.pop(b)], rides.source.fps, rides, user=False)
+        by_id[merged.ride_id] = merged
+    ordered = sorted(by_id.values(), key=lambda r: r.start_s)
+    return rides.model_copy(update={"rides": ordered})

@@ -22,7 +22,7 @@ from surfclip.api.jobs import Job, Jobs, Report
 from surfclip.config import DEFAULT_CONFIG_PATH, load_config
 from surfclip.edits.apply import RIDER_OPS, undone_ids
 from surfclip.edits.log import append_edit, confirmed_zone, read_edits
-from surfclip.edits.rebuild import rebuild_rides
+from surfclip.edits.rebuild import AUTO_JOINS_FILE, rebuild_rides
 from surfclip.eval.labels import LabelError, LabelWork, SessionLabels, finalize, work_from_rides
 from surfclip.eval.riders import RiderLabelWork, detected_grouping, propose_work
 from surfclip.eval.riders import finalize as finalize_riders
@@ -40,6 +40,7 @@ from surfclip.riders.session import RIDERS_FILE, load_appearance, ride_key
 from surfclip.riders.stills import rider_still, still_path
 from surfclip.rides.evidence import Obs
 from surfclip.store.schemas import (
+    AutoJoins,
     EditTarget,
     RiderGroup,
     Riders,
@@ -92,6 +93,15 @@ class ExportRequest(BaseModel):
     rides: list[str] | None = None  # default: every ride (only new or changed ones re-encode)
     reel: bool = False  # also join the clips into one video (clips/reel.mp4)
     rider: str | None = None  # only this rider's rides (name or rider id); reel_<rider>.mp4
+
+
+class JoinRequest(BaseModel):
+    first: str
+    second: str
+
+
+class UnjoinRequest(BaseModel):
+    ride_id: str
 
 
 RiderOp = Literal["rider_name", "rider_same_as", "rider_mixed", "rider_ignore", "ride_rider"]
@@ -662,6 +672,51 @@ def create_app(
             edit = append_edit(store, req.op, EditTarget(), payload)
             refresh_riders(store, load_config(config_path, store.session.config_overrides))
         return {"edit": edit.model_dump(mode="json"), "riders": get_riders(sid)["riders"]}
+
+    @app.post("/api/sessions/{sid}/joins")
+    def join_rides(sid: str, req: JoinRequest) -> dict[str, Any]:
+        """Join a suggested pair (a user merge of two rides split at the frame edge)."""
+        store = store_of(sid)
+        with write_lock:
+            rides: Rides = read(folder(sid) / "rides.json", Rides)
+            by_id = {r.ride_id: r for r in rides.rides}
+            if req.first not in by_id or req.second not in by_id or req.first == req.second:
+                raise ApiError(404, "ride_not_found", "pick two rides of this session")
+            ids = [req.first, req.second]
+            spans = {i: [by_id[i].start_s, by_id[i].end_s] for i in ids}
+            append_edit(store, "merge", EditTarget(ride_ids=ids), {"spans": spans, "how": "join"})
+            rebuild_rides(store)
+            refresh_riders(store, load_config(config_path, store.session.config_overrides))
+        return {"riders": get_riders(sid)["riders"]}
+
+    @app.post("/api/sessions/{sid}/unjoin")
+    def unjoin_ride(sid: str, req: UnjoinRequest) -> dict[str, Any]:
+        """Undo an automatic join: the two rides stay apart from now on."""
+        store = store_of(sid)
+        with write_lock:
+            rides: Rides = read(folder(sid) / "rides.json", Rides)
+            ride = next((r for r in rides.rides if r.ride_id == req.ride_id), None)
+            if ride is None or not ride.flags.joined:
+                raise ApiError(404, "ride_not_found", f"{req.ride_id} is not a joined ride")
+            joins_file = store.path(AUTO_JOINS_FILE)
+            joins = (
+                store.read_model(AUTO_JOINS_FILE, AutoJoins).joins if joins_file.exists() else []
+            )
+            pair = next(
+                (p for p in joins if ride.start_s - 0.5 <= p[0][1] and p[1][2] <= ride.end_s + 0.5),
+                None,
+            )
+            if pair is None:
+                raise ApiError(404, "ride_not_found", f"no automatic join in {req.ride_id}")
+            append_edit(
+                store,
+                "rider_unjoin",
+                EditTarget(),
+                {"first": list(pair[0]), "second": list(pair[1])},
+            )
+            rebuild_rides(store)
+            refresh_riders(store, load_config(config_path, store.session.config_overrides))
+        return {"riders": get_riders(sid)["riders"]}
 
     @app.post("/api/sessions/{sid}/rider-edits/reset")
     def reset_rider_edits(sid: str) -> dict[str, Any]:

@@ -103,6 +103,7 @@ export interface RideFlags {
   truncated: boolean
   user_edited: boolean
   user_added: boolean
+  joined?: boolean
 }
 
 export interface ExportRecord {
@@ -263,6 +264,10 @@ export const api = {
   rides: (id: string, rider?: string) =>
     call<Rides>(`/sessions/${id}/rides${rider ? `?rider=${encodeURIComponent(rider)}` : ''}`),
   riders: (id: string) => call<RidersInfo>(`/sessions/${id}/riders`),
+  joinRides: (id: string, first: string, second: string) =>
+    call<{ riders: RiderGroup[] }>(`/sessions/${id}/joins`, { method: 'POST', body: JSON.stringify({ first, second }) }),
+  unjoinRide: (id: string, rideId: string) =>
+    call<{ riders: RiderGroup[] }>(`/sessions/${id}/unjoin`, { method: 'POST', body: JSON.stringify({ ride_id: rideId }) }),
   resetRiders: (id: string) =>
     call<{ undone: number }>(`/sessions/${id}/rider-edits/reset`, { method: 'POST' }),
   riderEdit: (id: string, req: RiderEditRequest) =>

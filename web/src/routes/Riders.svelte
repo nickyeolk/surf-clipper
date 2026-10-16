@@ -104,6 +104,31 @@
       busy = false
     }
   }
+  async function joinPair(first: string, second: string) {
+    busy = true
+    try {
+      await api.joinRides(sessionId, first, second)
+      await load()
+      status = 'rides joined'
+    } catch (e) {
+      status = (e as Error).message
+    } finally {
+      busy = false
+    }
+  }
+  async function unjoin(rideId: string) {
+    if (!confirm('Split this ride back into the two parts it was joined from?')) return
+    busy = true
+    try {
+      await api.unjoinRide(sessionId, rideId)
+      await load()
+      status = 'ride split back in two'
+    } catch (e) {
+      status = (e as Error).message
+    } finally {
+      busy = false
+    }
+  }
   async function startOver() {
     if (!confirm('Undo every rider change in this session (names, merges, splits, moves)?')) return
     busy = true
@@ -169,6 +194,20 @@
     </section>
 
     <section class="cards">
+      {#if info.join_suggestions.length}
+        <div class="card wide joins">
+          <strong>Possibly one ride split in two</strong>
+          <span class="muted small">the rider left the frame and came back; play both, then join</span>
+          {#each info.join_suggestions as s (s.first + s.second)}
+            <div class="row">
+              <button class="still" onclick={() => play(s.first)}><img alt="" src={still(s.first)} /></button>
+              <button class="still" onclick={() => play(s.second)}><img alt="" src={still(s.second)} /></button>
+              <span class="small time">{byId.get(s.first) ? clock(byId.get(s.first)!.start_s) : ''} · gap {s.gap_s.toFixed(1)} s</span>
+              <button onclick={() => joinPair(s.first, s.second)} disabled={busy}>join</button>
+            </div>
+          {/each}
+        </div>
+      {/if}
       {#each active as g (g.rider_id)}
         <div class="card" class:wide={open[g.rider_id]}>
           <div class="head">
@@ -194,7 +233,12 @@
                   <button class="still" onclick={() => play(r.ride_id)} title="Play this ride">
                     <img loading="lazy" alt="" src={still(r.ride_id)} />
                   </button>
-                  <span class="small time">{clock(r.start_s)}</span>
+                  <span class="small time">{clock(r.start_s)}
+                    {#if r.flags.joined}<span class="tag" title="Two parts joined: the rider left the frame and came back">joined</span>{/if}
+                  </span>
+                  {#if r.flags.joined}
+                    <button class="small" onclick={() => unjoin(r.ride_id)} disabled={busy}>unjoin</button>
+                  {/if}
                   <select disabled={busy} onchange={(e) => move(r.ride_id, e.currentTarget)}>
                     <option value="">move to…</option>
                     {#each active.filter((o) => o.rider_id !== g.rider_id) as o (o.rider_id)}
