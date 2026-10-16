@@ -125,6 +125,15 @@ def _apply(edit: UserEdit, rides: dict[str, Ride], rules: RiderRules) -> None:
             return
         if isinstance(p.get("name"), str) and p.get("name"):
             rules.fixed[ride] = str(p["name"])
+        away = _ride_ref(p.get("away_from"))  # moved out of a group: apart from its old example
+        if away is not None:
+            old = resolve_ride(away[0], away[1], rides)
+            if old is not None and old != ride:
+                rules.must = [
+                    m for m in rules.must if ride not in m
+                ]  # earlier joins no longer hold
+                rules.cannot = [c for c in rules.cannot if ride not in c]
+                rules.cannot.append((ride, old))
         other = _ride_ref(p.get("same_as_ride"))
         if other is not None:
             target = resolve_ride(other[0], other[1], rides)

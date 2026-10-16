@@ -218,6 +218,7 @@ export interface RiderEditRequest {
   other_rider_id?: string
   ride_id?: string
   same_as_ride_id?: string
+  to_rider_id?: string
   name?: string
   not_name?: string
   ignore?: boolean
@@ -262,6 +263,8 @@ export const api = {
   rides: (id: string, rider?: string) =>
     call<Rides>(`/sessions/${id}/rides${rider ? `?rider=${encodeURIComponent(rider)}` : ''}`),
   riders: (id: string) => call<RidersInfo>(`/sessions/${id}/riders`),
+  resetRiders: (id: string) =>
+    call<{ undone: number }>(`/sessions/${id}/rider-edits/reset`, { method: 'POST' }),
   riderEdit: (id: string, req: RiderEditRequest) =>
     call<{ edit: UserEdit; riders: RiderGroup[] }>(`/sessions/${id}/rider-edits`, {
       method: 'POST',

@@ -22,7 +22,7 @@ from numpy.typing import NDArray
 
 from surfclip.config import RidersConfig
 from surfclip.riders.assign import assign_confidence, queue
-from surfclip.riders.cluster import Constraints, group_rides
+from surfclip.riders.cluster import Constraints, group_rides, split_two
 from surfclip.riders.crops import read_frames, ride_crops, ride_moments
 from surfclip.riders.describe import (
     DESC_LEN,
@@ -265,18 +265,15 @@ def build_riders(
     spans = {r.ride_id: (r.start_s, r.end_s) for r in rides}
     constraints = rules.constraints()
     must, cannot = list(constraints.must), list(constraints.cannot)
-    for group in rules.mixed:  # split a mixed group in two by appearance, then keep it apart
+    for group in rules.mixed:  # split a mixed group in two by appearance and keep them apart
         present = [r for r in group if r in vectors]
         if len(present) < 2:
             continue
-        halves = group_rides(
-            {r: vectors[r] for r in present}, spans, app.distance,
-            threshold=float("inf"), overlap_allowed_s=overlap_allowed_s, stop_at=2,
-        )  # fmt: skip
-        if len(halves) == 2:
-            for half in halves:
-                must += [(half[0], r) for r in half[1:]]
-            cannot += [(a, b) for a in halves[0] for b in halves[1]]
+        first, second = split_two(present, vectors, app.distance)
+        # Only "apart" rules: each half may still regroup, and single rides can still be moved.
+        across = {(a, b) for a in first for b in second} | {(b, a) for a in first for b in second}
+        must = [pair for pair in must if pair not in across]  # a later "mixed" wins
+        cannot += [(a, b) for a in first for b in second]
     constraints = Constraints(must=must, cannot=cannot, fixed=constraints.fixed)
     groups = group_rides(
         vectors, spans, app.distance,

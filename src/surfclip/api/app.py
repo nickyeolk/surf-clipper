@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from surfclip.api.jobs import Job, Jobs, Report
 from surfclip.config import DEFAULT_CONFIG_PATH, load_config
+from surfclip.edits.apply import RIDER_OPS, undone_ids
 from surfclip.edits.log import append_edit, confirmed_zone, read_edits
 from surfclip.edits.rebuild import rebuild_rides
 from surfclip.eval.labels import LabelError, LabelWork, SessionLabels, finalize, work_from_rides
@@ -105,6 +106,7 @@ class RiderEditRequest(BaseModel):
     other_rider_id: str | None = None
     ride_id: str | None = None
     same_as_ride_id: str | None = None
+    to_rider_id: str | None = None  # move ride_id to this rider
     name: str | None = None
     not_name: str | None = None
     ignore: bool = True
@@ -620,15 +622,46 @@ def create_app(
                 payload = {"ride": ride_ref(req.ride_id)}
                 if req.name:
                     payload["name"] = req.name.strip()
-                if req.same_as_ride_id:
-                    payload["same_as_ride"] = ride_ref(req.same_as_ride_id)
+                same_as = req.same_as_ride_id
+                if req.to_rider_id:  # move to another rider: join its example ride
+                    target = group(req.to_rider_id)
+                    same_as = next((r for r in target.ride_ids if r != req.ride_id), None)
+                    if target.example_ride_id and target.example_ride_id != req.ride_id:
+                        same_as = target.example_ride_id
+                if same_as:
+                    payload["same_as_ride"] = ride_ref(same_as)
                 if req.not_name:
                     payload["not_name"] = req.not_name
                 if len(payload) == 1:
                     raise ApiError(400, "invalid_edit", "say who rode it (name, same as or not)")
+                if req.to_rider_id or req.name:  # leaving its card: apart from that card
+                    home = next((g for g in riders.riders if req.ride_id in g.ride_ids), None)
+                    if home is not None and home.rider_id != req.to_rider_id:
+                        others = [r for r in home.ride_ids if r != req.ride_id]
+                        anchor = (
+                            home.example_ride_id
+                            if home.example_ride_id and home.example_ride_id != req.ride_id
+                            else (others[0] if others else None)
+                        )
+                        if anchor:
+                            payload["away_from"] = ride_ref(anchor)
             edit = append_edit(store, req.op, EditTarget(), payload)
             refresh_riders(store, load_config(config_path, store.session.config_overrides))
         return {"edit": edit.model_dump(mode="json"), "riders": get_riders(sid)["riders"]}
+
+    @app.post("/api/sessions/{sid}/rider-edits/reset")
+    def reset_rider_edits(sid: str) -> dict[str, Any]:
+        """Start over: undo every rider edit still in effect (the log stays append-only)."""
+        store = store_of(sid)
+        with write_lock:
+            edits = read_edits(store)
+            undone = undone_ids(edits)
+            active = [e for e in edits.edits if e.op in RIDER_OPS and e.edit_id not in undone]
+            for e in reversed(active):
+                append_edit(store, "undo", EditTarget(), {"edit_id": e.edit_id})
+            if active:
+                refresh_riders(store, load_config(config_path, store.session.config_overrides))
+        return {"undone": len(active), "riders": get_riders(sid)["riders"]}
 
     @app.post("/api/sessions/{sid}/export")
     def post_export(sid: str, req: ExportRequest) -> Job:

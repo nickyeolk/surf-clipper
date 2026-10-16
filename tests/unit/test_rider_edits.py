@@ -120,3 +120,19 @@ def test_undo_and_reattach_after_rerun() -> None:
     rerun = [ride(k, 0.4, rid=f"x{k}") for k in range(9)]
     named = log(("rider_name", {"name": "me", "rides": spans(0, 3, 6), "examples": spans(0)}))
     assert group(build(rerun, named), "x3")[0] == "me"
+
+
+def test_move_one_ride_to_another_rider() -> None:
+    # r6 (rider a) moved to rider b's card: joins b's example, apart from a's example.
+    move = log(("ride_rider", {"ride": ["r6", 600.0, 630.0], "same_as_ride": ["r1", 100.0, 130.0],
+                               "away_from": ["r0", 0.0, 30.0]}))  # fmt: skip
+    riders = build(RIDES, move)
+    assert "r6" in group(riders, "r1")[1] and "r6" not in group(riders, "r0")[1]
+
+
+def test_mixed_after_same_as_splits_again() -> None:
+    same = log(("rider_same_as", {"rides": spans(0, 3, 6), "other": spans(1, 4, 7)}))
+    mixed = more(same, ("rider_mixed", {"rides": spans(0, 1, 3, 4, 6, 7)}))
+    riders = build(RIDES, mixed)
+    assert group(riders, "r0")[1] == ["r0", "r3", "r6"]
+    assert group(riders, "r1")[1] == ["r1", "r4", "r7"]

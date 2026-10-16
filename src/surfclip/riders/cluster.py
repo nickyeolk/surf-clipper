@@ -133,3 +133,27 @@ def group_rides(
         alive[j] = False
     groups = [sorted(members[k], key=lambda r: spans[r][0]) for k in range(n) if alive[k]]
     return sorted(groups, key=lambda g: (-len(g), spans[g[0]][0]))
+
+
+def split_two(
+    ids: Sequence[str], descriptors: Mapping[str, FloatArray], distance: Distance
+) -> tuple[list[str], list[str]]:
+    """Split rides into the two most different sets (2-medoids, seeded by the farthest pair).
+
+    Used for "mixed": unlike clustering it ignores time overlaps (the user said the card holds
+    two people, so the split must happen) and always returns two non-empty sets for 2+ rides.
+    """
+    if len(ids) < 2:
+        return list(ids), []
+    d = {(a, b): distance(descriptors[a], descriptors[b]) for a in ids for b in ids}
+    medoids = max(((a, b) for a in ids for b in ids if a < b), key=lambda p: d[p])
+    halves: tuple[list[str], list[str]] = ([], [])
+    for _ in range(20):
+        halves = ([], [])
+        for r in ids:
+            halves[0 if d[(r, medoids[0])] <= d[(r, medoids[1])] else 1].append(r)
+        new = tuple(min(h, key=lambda m: sum(d[(m, x)] for x in h)) for h in halves)
+        if new == medoids:
+            break
+        medoids = (new[0], new[1])
+    return halves

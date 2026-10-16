@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from surfclip.riders.cluster import Constraints, group_rides
+from surfclip.riders.cluster import Constraints, group_rides, split_two
 
 
 def euclid(a: np.ndarray, b: np.ndarray) -> float:
@@ -80,3 +80,12 @@ def test_split_in_two() -> None:
     )  # fmt: skip
     assert len(groups) == 2
     assert all(len({int(r[1:]) % 3 for r in g}) == 1 for g in groups)
+
+
+def test_split_two_always_splits() -> None:
+    desc, _ = session()
+    two = [k for k in desc if int(k[1:]) % 3 in (0, 1)]
+    first, second = split_two(two, desc, euclid)
+    assert first and second
+    assert {int(r[1:]) % 3 for r in first} != {int(r[1:]) % 3 for r in second}
+    assert all(len({int(r[1:]) % 3 for r in h}) == 1 for h in (first, second))
