@@ -236,6 +236,63 @@ export interface RiderEditRequest {
 }
 
 // ---- 003: health, exports viewer, stills ----------------------------------------------------
+// ---- 004: ride analysis ----------------------------------------------------------------------
+export interface AnalysisEvent {
+  t: number
+  depth: number | null
+  name?: string | null
+  edit_id?: number | null
+  by?: 'auto' | 'user'
+}
+
+export interface RideAnalysis {
+  ride_id: string
+  span: [number, number]
+  rider: string
+  fps: number
+  t0: number
+  compression: (number | null)[]
+  lean: (number | null)[]
+  arms: (number | null)[]
+  stance: (number | null)[]
+  turns: AnalysisEvent[]
+  pumps: AnalysisEvent[]
+  shares: { turning: number; pumping: number; trimming: number; unclear: number }
+  ending: 'fall' | 'exit' | 'unclear'
+  summary: { length_s: number; turns: number; pumps: number; turn_rate_per_10s: number; rhythm_cv: number | null; mean_depth: number | null }
+  tricks: AnalysisEvent[]
+  starred: boolean
+  score: { value: number; parts: Record<string, number>; explanation: string } | null
+}
+
+export interface AnalysisFile {
+  session_id: string
+  rides: RideAnalysis[]
+}
+
+export interface KeypointFrame {
+  t: number
+  box: (number | null)[]
+  kp: [number | null, number | null, number][]
+}
+
+export interface KeypointData {
+  fps: number
+  width: number
+  height: number
+  frames: KeypointFrame[]
+}
+
+export interface TrickTag {
+  session_id: string
+  video: string
+  ride_id: string
+  t: number
+  name: string
+  rider: string
+  edit_id: number
+}
+
 export interface DeletedRide {
   edit_id: number
   ride_id: string
@@ -382,6 +439,18 @@ export const api = {
   job: (jobId: string) => call<Job>(`/jobs/${jobId}`),
   thumbUrl: (id: string, t: number) => `/api/sessions/${id}/media/thumb.jpg?t=${(Math.round(t * 2) / 2).toFixed(1)}`,
   clipUrl: (id: string, rideId: string) => `/api/sessions/${id}/media/clips/${rideId}.mp4`,
+  analysis: (id: string) => call<AnalysisFile>(`/sessions/${id}/analysis`),
+  runAnalysis: (id: string) => call<Job>(`/sessions/${id}/analysis`, { method: 'POST' }),
+  keypoints: (id: string, rideId: string) => call<KeypointData>(`/sessions/${id}/analysis/${rideId}/keypoints`),
+  star: (id: string, rideId: string, starred: boolean) =>
+    call<{ ride_id: string; starred: boolean }>(`/sessions/${id}/stars`, {
+      method: 'POST',
+      body: JSON.stringify({ ride_id: rideId, starred }),
+    }),
+  addTrick: (id: string, rideId: string, t: number, name: string) =>
+    call<TrickTag>(`/sessions/${id}/tricks`, { method: 'POST', body: JSON.stringify({ ride_id: rideId, t, name }) }),
+  deleteTrick: (id: string, editId: number) => fetch(`/api/sessions/${id}/tricks/${editId}`, { method: 'DELETE' }),
+  tricks: (name?: string) => call<TrickTag[]>(`/tricks${name ? `?name=${encodeURIComponent(name)}` : ''}`),
   deleted: (id: string) => call<DeletedRide[]>(`/sessions/${id}/deleted`),
   restore: (id: string, editIds: number[] | null) =>
     call<{ restored: number[]; rides: Rides }>(`/sessions/${id}/restore`, {

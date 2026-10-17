@@ -27,15 +27,15 @@ description: "Task list for feature 004: ride analysis (rescoped 2026-10-17)"
 
 ## Phase 2: Measures and keypoints for the UI
 
-- [ ] T011 [P] Unit tests: lean, arm spread, stance width are zoom- and mirror-invariant (lean flips sign when mirrored); unclear → null
-- [ ] T012 Measures in src/surfclip/analysis/signals.py; series `lean`, `arms`, `stance` in `RideAnalysis`
-- [ ] T013 Routes: `GET /sessions/{id}/analysis` (with stars and tags applied), `POST /sessions/{id}/analysis` (job), `GET /sessions/{id}/analysis/{ride}/keypoints` (review-copy pixels + crop box per frame); contract tests
+- [x] T011 [P] Unit tests: lean, arm spread, stance width are zoom- and mirror-invariant (lean flips sign when mirrored); unclear → null
+- [x] T012 Measures in src/surfclip/analysis/signals.py; series `lean`, `arms`, `stance` in `RideAnalysis`
+- [x] T013 Routes: `GET /sessions/{id}/analysis` (with stars and tags applied), `POST /sessions/{id}/analysis` (job), `GET /sessions/{id}/analysis/{ride}/keypoints` (review-copy pixels + crop box per frame); contract tests
 
 ## Phase 3: US1 - Side by side (P1) 🎯
 
-- [ ] T014 web/src/lib/Skeleton.svelte: canvas overlay drawing keypoints interpolated to the video time, scaled into a crop, mirror-aware
-- [ ] T015 web/src/lib/CropPlayer.svelte: review video in a container whose CSS transform follows the surfer's smoothed crop box; skeleton; exposes time, seek, play, rate, frame step; mirror toggle
-- [ ] T016 web/src/routes/Compare.svelte (`#/compare?a=…&b=…`): pickers for A and B (my rides, named riders' rides in any session, references, trick tags), sync point per side ("set sync here", "snap to nearest turn/tag"), shared transport keeping B at A's offset (resync each frame when drift > half a frame), measure curves of both aligned at sync (SVG); entry points from Review, Riders and Tricks
+- [x] T014 web/src/lib/Skeleton.svelte: canvas overlay drawing keypoints interpolated to the video time, scaled into a crop, mirror-aware
+- [x] T015 web/src/lib/CropPlayer.svelte: review video in a container whose CSS transform follows the surfer's smoothed crop box; skeleton; exposes time, seek, play, rate, frame step; mirror toggle
+- [x] T016 web/src/routes/Compare.svelte (`#/compare?a=…&b=…`): pickers for A and B (my rides, named riders' rides in any session, references, trick tags), sync point per side ("set sync here", "snap to nearest turn/tag"), shared transport keeping B at A's offset (resync each frame when drift > half a frame), measure curves of both aligned at sync (SVG); entry points from Review, Riders and Tricks
 - [ ] T017 Browser check (SC-001, SC-005): two rides synced within one frame over 30 s at 1x and 0.25x; skeletons keep up; record in eval-log.md
 
 ## Phase 4: US2 - Reference clips (P1)
