@@ -15,6 +15,7 @@ from pathlib import Path
 from surfclip.analysis.pose import (
     Keypoints,
     PoseModel,
+    keypoints_key_of,
     read_keypoints,
     ride_keypoints,
     write_keypoints,
@@ -86,9 +87,11 @@ def analyse_session(
     cfg: Config,
     *,
     cpu: bool = False,
-    only_rider: str | None = None,
+    riders: list[str] | None = None,
     progress: Callable[[float, str], None] | None = None,
 ) -> AnalysisFile:
+    """Analyse the rides of the given named riders (all named riders when None). Results for
+    other named riders are kept as they were; body data of riders no longer named is deleted."""
     from surfclip.stages import session_observations
 
     if store.session.kind == "reference":  # an imported clip: its chosen surfer, one "ride"
@@ -96,15 +99,15 @@ def analyse_session(
 
         ref = reference_ride(store)
         todo = [ref] if ref is not None else []
-        names = {r.ride_id: Path(store.session.source_path).stem for r in todo}
+        all_named = names = {r.ride_id: Path(store.session.source_path).stem for r in todo}
     else:
         rides = store.read_model("rides.json", Rides)
-        riders = (
+        groups = (
             store.read_model("riders.json", Riders) if store.path("riders.json").exists() else None
         )
-        names = named_riders(riders)
-        if only_rider is not None:
-            names = {r: n for r, n in names.items() if n.lower() == only_rider.lower()}
+        all_named = named_riders(groups)
+        wanted = None if riders is None else {n.strip().lower() for n in riders}
+        names = {r: n for r, n in all_named.items() if wanted is None or n.lower() in wanted}
         todo = sorted((r for r in rides.rides if r.ride_id in names), key=lambda r: r.start_s)
     old = read_analysis(store)
     previous = {a.ride_id: a for a in old.rides} if old else {}
@@ -124,7 +127,9 @@ def analyse_session(
             out.append(prev)
             continue
         path = store.path(f"{KEYPOINT_DIR}/{ride.ride_id}.parquet")
-        if prev is not None and prev.keypoints_key == kkey and path.exists():
+        if path.exists() and (
+            (prev is not None and prev.keypoints_key == kkey) or keypoints_key_of(path) == kkey
+        ):
             kp = read_keypoints(path)
         else:
             if obs is None:
@@ -147,19 +152,18 @@ def analyse_session(
                     progress((i + f) / len(todo), f"pose: ride {i + 1} of {len(todo)}")
 
             kp = ride_keypoints(info, ride, track, others, model, progress=step)
-            write_keypoints(path, kp)
+            write_keypoints(path, kp, kkey)
         out.append(measure(store, ride, kp, cfg, rider, (key, kkey)))
         if progress:
             progress((i + 1) / len(todo), f"analysed ride {i + 1} of {len(todo)}")
-    keep = {r.ride_id for r in todo} if only_rider is None else None
-    kp_dir = store.path(KEYPOINT_DIR)
-    if keep is not None and kp_dir.exists():  # body data only for named riders' rides (FR-010)
-        for f in list(kp_dir.glob("*.parquet")):
-            if f.stem not in keep:
-                f.unlink()
-    if keep is None and old is not None:  # one rider re-analysed: keep the others' results
+    if old is not None:  # named riders not chosen this time keep their results
         done = {a.ride_id for a in out}
-        out += [a for a in old.rides if a.ride_id not in done]
+        out += [a for a in old.rides if a.ride_id not in done and a.ride_id in all_named]
+    kp_dir = store.path(KEYPOINT_DIR)
+    if kp_dir.exists():  # body data only for rides of named riders (FR-010)
+        for f in list(kp_dir.glob("*.parquet")):
+            if f.stem not in all_named:
+                f.unlink()
     result = AnalysisFile(
         session_id=store.session.session_id,
         settings=cfg.analysis_pose.model_dump(mode="json"),

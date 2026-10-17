@@ -294,17 +294,21 @@ def export(
 @app.command("analyse-rides")
 def analyse_rides(
     video: Path,
+    rider: Annotated[
+        list[str] | None, typer.Option("--rider", help="Only these named riders (repeatable).")
+    ] = None,
     artifacts: ArtifactsOpt = Path("artifacts"),
     config: ConfigOpt = DEFAULT_CONFIG_PATH,
     cpu: CpuOpt = False,
     timings: Annotated[bool, typer.Option("--timings")] = False,
 ) -> None:
     """Analyse the rides of named riders: keypoints, compression, turns, pumps, endings."""
-    from surfclip.analysis.service import read_analysis
+    from surfclip.analysis.service import analyse_session
 
-    store = _run(video, "analysis", artifacts, config, cpu, timings)
-    result = read_analysis(store)
-    if result is None or not result.rides:
+    store = _run(video, "riders", artifacts, config, cpu, timings)
+    cfg = load_config(config, store.session.config_overrides)
+    result = analyse_session(store, cfg, cpu=cpu, riders=rider)
+    if not result.rides:
         typer.echo("no rides analysed: name a rider first (`surfclip riders name`)")
         return
     for a in result.rides:

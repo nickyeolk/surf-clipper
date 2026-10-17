@@ -456,7 +456,8 @@ export const api = {
   thumbUrl: (id: string, t: number) => `/api/sessions/${id}/media/thumb.jpg?t=${(Math.round(t * 2) / 2).toFixed(1)}`,
   clipUrl: (id: string, rideId: string) => `/api/sessions/${id}/media/clips/${rideId}.mp4`,
   analysis: (id: string) => call<AnalysisFile>(`/sessions/${id}/analysis`),
-  runAnalysis: (id: string) => call<Job>(`/sessions/${id}/analysis`, { method: 'POST' }),
+  runAnalysis: (id: string, riders?: string[]) =>
+    call<Job>(`/sessions/${id}/analysis`, { method: 'POST', body: JSON.stringify({ riders: riders ?? null }) }),
   keypoints: (id: string, rideId: string) => call<KeypointData>(`/sessions/${id}/analysis/${rideId}/keypoints`),
   star: (id: string, rideId: string, starred: boolean) =>
     call<{ ride_id: string; starred: boolean }>(`/sessions/${id}/stars`, {

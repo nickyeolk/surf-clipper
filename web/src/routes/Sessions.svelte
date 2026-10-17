@@ -44,9 +44,46 @@
   let analyseJobs = $state<Record<string, Job>>({})
   let references = $state<ReferenceClip[]>([])
   let refChosen = $state('')
-  async function analyse(sid: string) {
+  // which named riders to analyse: a small menu per session
+  interface NamePick {
+    name: string
+    rides: number
+    analysed: number
+    checked: boolean
+  }
+  let pickFor = $state<string | null>(null)
+  let picks = $state<NamePick[]>([])
+  let pickNote = $state('')
+  async function openPicker(sid: string) {
+    if (pickFor === sid) {
+      pickFor = null
+      return
+    }
+    pickFor = sid
+    picks = []
+    pickNote = 'loading…'
     try {
-      let job = await api.runAnalysis(sid)
+      const info = await api.riders(sid)
+      const done = await api.analysis(sid).then((a) => a.rides).catch(() => [])
+      const named = info.riders.filter((g) => g.name && !g.ignored)
+      const analysed = new Set(done.map((r) => r.rider.toLowerCase()))
+      const me = named.find((g) => g.name!.toLowerCase() === 'me')
+      picks = named.map((g) => ({
+        name: g.name!,
+        rides: g.ride_ids.length,
+        analysed: done.filter((r) => r.rider.toLowerCase() === g.name!.toLowerCase()).length,
+        // default: whoever was analysed before, else "me", else everyone named
+        checked: analysed.size ? analysed.has(g.name!.toLowerCase()) : me ? g === me : true,
+      }))
+      pickNote = picks.length ? '' : 'Nobody is named in this session yet: name riders in Riders first.'
+    } catch {
+      pickNote = 'No riders yet for this session.'
+    }
+  }
+  async function analyse(sid: string, riders?: string[]) {
+    pickFor = null
+    try {
+      let job = await api.runAnalysis(sid, riders)
       analyseJobs[sid] = job
       while (job.status === 'queued' || job.status === 'running') {
         await new Promise((r) => setTimeout(r, 1500))
@@ -215,8 +252,31 @@
                   {#if analyseJobs[s.session_id] && ['queued', 'running'].includes(analyseJobs[s.session_id].status)}
                     <span class="small">analysing <progress max="1" value={analyseJobs[s.session_id].progress}></progress></span>
                   {:else}
-                    <button class="secondary" onclick={() => analyse(s.session_id)}
-                      title="Body positions on the rides of riders you named (needed for Compare and Best)">Analyse rides</button>
+                    <span class="picker">
+                      <button class="secondary" onclick={() => openPicker(s.session_id)}
+                        title="Body positions on the rides of the named riders you choose (needed for Compare and Best)">Analyse rides ▾</button>
+                      {#if pickFor === s.session_id}
+                        <div class="menu">
+                          {#if pickNote}<p class="small">{pickNote}</p>{/if}
+                          {#each picks as p (p.name)}
+                            <label class="small">
+                              <input type="checkbox" bind:checked={p.checked} />
+                              {p.name} <span class="muted">{p.rides} rides{p.analysed ? `, ${p.analysed} analysed` : ''}</span>
+                            </label>
+                          {/each}
+                          {#if picks.length}
+                            <div class="row small">
+                              <button class="primary" disabled={!picks.some((p) => p.checked)}
+                                onclick={() => analyse(s.session_id, picks.filter((p) => p.checked).map((p) => p.name))}>
+                                Analyse {picks.filter((p) => p.checked).reduce((n, p) => n + p.rides, 0)} rides
+                              </button>
+                              <button onclick={() => (pickFor = null)}>cancel</button>
+                            </div>
+                            <p class="small muted">About 6-15 s per ride. Unticked riders keep what they already have.</p>
+                          {/if}
+                        </div>
+                      {/if}
+                    </span>
                   {/if}
                   {#if analyseJobs[s.session_id]?.status === 'failed'}<span class="error small">{analyseJobs[s.session_id].error}</span>{/if}
                   <a class="button secondary" href={`#/best/${s.session_id}`} title="Your rides by score; star the ones you love">Best</a>
@@ -274,6 +334,32 @@
 {/if}
 
 <style>
+  .picker {
+    position: relative;
+    display: inline-block;
+  }
+  .menu {
+    position: absolute;
+    z-index: 10;
+    top: 100%;
+    left: 0;
+    min-width: 240px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    white-space: normal;
+  }
+  .menu label {
+    display: block;
+    padding: 2px 0;
+  }
+  .menu .row {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
   .title {
     display: flex;
     align-items: center;

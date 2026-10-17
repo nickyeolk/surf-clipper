@@ -156,6 +156,10 @@ class RiderEditRequest(BaseModel):
     ignore: bool = True
 
 
+class AnalyseRequest(BaseModel):
+    riders: list[str] | None = None  # names to analyse; None = every named rider
+
+
 class StarRequest(BaseModel):
     ride_id: str
     starred: bool = True
@@ -1011,19 +1015,21 @@ def create_app(
         return analysis_of(sid)
 
     @app.post("/api/sessions/{sid}/analysis")
-    def post_analysis(sid: str) -> Job:
+    def post_analysis(sid: str, req: AnalyseRequest | None = None) -> Job:
         store = store_of(sid)
         running = work_jobs.active(sid, "analysis")
         if running is not None:
             return running
         cfg = load_config(config_path, store.session.config_overrides)
+        chosen = req.riders if req is not None else None
 
         def work(report: Report) -> dict[str, object]:
+            # rides and riders up to date first (cached), then only the chosen riders
             default_pipeline().run(
-                store, cfg, until="analysis", progress=lambda _s, f, m: report(f, m)
+                store, cfg, until="riders", progress=lambda _s, f, m: report(0, m)
             )
-            result = read_analysis(store)
-            return {"rides": len(result.rides) if result else 0}
+            result = analyse_session(store, cfg, riders=chosen, progress=report)
+            return {"rides": len(result.rides)}
 
         return work_jobs.submit("analysis", sid, work)
 

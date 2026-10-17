@@ -198,7 +198,9 @@ def _other_iou(times: FloatArray, boxes: FloatArray, others: list[Obs]) -> Float
     return out
 
 
-def write_keypoints(path: Path, kp: Keypoints) -> None:
+def write_keypoints(path: Path, kp: Keypoints, key: str = "") -> None:
+    """Keypoints as parquet; ``key`` (span + pose settings) is stored with them, so a run that
+    was stopped part-way reuses every ride it finished."""
     path.parent.mkdir(parents=True, exist_ok=True)
     table = pa.table(
         {
@@ -207,10 +209,19 @@ def write_keypoints(path: Path, kp: Keypoints) -> None:
             "kp": pa.array(kp.kp.reshape(len(kp), -1).tolist(), type=pa.list_(pa.float64(), 51)),
             "other_iou": kp.other_iou,
         }
-    )
+    ).replace_schema_metadata({"keypoints_key": key})
     tmp = path.with_suffix(".tmp")
     pq.write_table(table, tmp)
     tmp.replace(path)
+
+
+def keypoints_key_of(path: Path) -> str:
+    """The key a keypoints file was written with ("" if unknown or unreadable)."""
+    try:
+        meta: dict[bytes, bytes] = pq.read_schema(path).metadata or {}
+    except (OSError, ValueError):
+        return ""
+    return meta.get(b"keypoints_key", b"").decode()
 
 
 def read_keypoints(path: Path) -> Keypoints:
