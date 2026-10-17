@@ -61,9 +61,7 @@ summary: list[str] = []
 
 
 def boxes_at(ride, times):
-    pts = sorted(
-        (o for t in ride.track_ids for o in by_track.get(t, [])), key=lambda o: o.t
-    )
+    pts = sorted((o for t in ride.track_ids for o in by_track.get(t, [])), key=lambda o: o.t)
     ts = np.array([o.t for o in pts])
     bx = np.array([o.box for o in pts])
     return np.stack([np.interp(times, ts, bx[:, k]) for k in range(4)], axis=1)
@@ -107,7 +105,11 @@ for ride in chosen:
             if res.keypoints is not None and len(res.keypoints) > 0:
                 # the person nearest the crop centre is the tracked rider
                 centres = res.boxes.xywh.cpu().numpy()[:, :2]
-                i = int(np.argmin(np.linalg.norm(centres - [crop.shape[1] / 2, crop.shape[0] / 2], axis=1)))
+                i = int(
+                    np.argmin(
+                        np.linalg.norm(centres - [crop.shape[1] / 2, crop.shape[0] / 2], axis=1)
+                    )
+                )
                 kp = res.keypoints.xy[i].cpu().numpy()
                 kc = res.keypoints.conf[i].cpu().numpy()
                 for j, (a, c) in JOINTS.items():
@@ -120,7 +122,9 @@ for ride in chosen:
                     lg = float(np.linalg.norm(mid(11, 12) - mid(15, 16)))
                 for a, c in EDGES:
                     if min(kc[a], kc[c]) >= 0.3:
-                        cv2.line(crop, tuple(map(int, kp[a])), tuple(map(int, kp[c])), (0, 255, 255), 2)
+                        cv2.line(
+                            crop, tuple(map(int, kp[a])), tuple(map(int, kp[c])), (0, 255, 255), 2
+                        )
                 for (x, y), c in zip(kp, kc, strict=True):
                     col = (0, 200, 0) if c >= 0.5 else (0, 160, 255) if c >= 0.3 else (0, 0, 255)
                     cv2.circle(crop, (int(x), int(y)), 4, col, -1)
@@ -128,7 +132,9 @@ for ride in chosen:
             leg.append(lg)
             tile = np.full((480, 360, 3), 20, np.uint8)
             s = min(360 / crop.shape[1], 440 / crop.shape[0])
-            small = cv2.resize(crop, (max(1, int(crop.shape[1] * s)), max(1, int(crop.shape[0] * s))))
+            small = cv2.resize(
+                crop, (max(1, int(crop.shape[1] * s)), max(1, int(crop.shape[0] * s)))
+            )
             tile[: small.shape[0], : small.shape[1]] = small
             cv2.putText(tile, f"{name} t={times[len(body) - 1] - ride.start_s:5.1f}s h={h:.0f}px",
                         (6, 468), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)  # fmt: skip
