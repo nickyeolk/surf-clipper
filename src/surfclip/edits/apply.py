@@ -54,7 +54,7 @@ def _respan(ride: Ride, start_s: float, end_s: float, fps: float, rides: Rides) 
     )
 
 
-def _spans(edit: UserEdit) -> dict[str, tuple[float, float]]:
+def edit_spans(edit: UserEdit) -> dict[str, tuple[float, float]]:
     raw = edit.payload.get("spans")
     if not isinstance(raw, dict):
         return {}
@@ -124,7 +124,7 @@ def apply_edits(detected: Rides, edits: Edits) -> Rides:
             continue
         tgt = edit.target
         wanted = tgt.ride_ids or ([tgt.ride_id] if tgt.ride_id else [])
-        spans = _spans(edit)
+        spans = edit_spans(edit)
         ids = [resolve_ride(w, spans.get(w), rides) for w in wanted]
         found = [i for i in ids if i is not None]
         if edit.op == "trim" and wanted and not found:

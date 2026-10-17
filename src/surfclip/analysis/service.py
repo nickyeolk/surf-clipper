@@ -162,3 +162,41 @@ def analyse_session(
 
 def empty_summary(ride: Ride) -> RideSummary:
     return RideSummary(length_s=round(ride.length_s, 3))
+
+
+def with_user_edits(store: SessionStore, result: AnalysisFile) -> AnalysisFile:
+    """Stars and trick tags from edits.json applied to the stage output (they are edits, so
+    they follow rides by span like every user correction; the latest star edit wins)."""
+    from surfclip.edits.apply import edit_spans, resolve_ride, undone_ids
+    from surfclip.edits.log import read_edits
+    from surfclip.store.schemas import AnalysisEvent
+
+    rides = {r.ride_id: r for r in store.read_model("rides.json", Rides).rides}
+    edits = read_edits(store)
+    undone = undone_ids(edits)
+    starred: dict[str, bool] = {}
+    tricks: dict[str, list[AnalysisEvent]] = {}
+    for e in edits.edits:
+        if e.op not in ("ride_star", "trick_tag") or e.edit_id in undone or not e.target.ride_id:
+            continue
+        rid = resolve_ride(e.target.ride_id, edit_spans(e).get(e.target.ride_id), rides)
+        if rid is None:
+            continue
+        if e.op == "ride_star":
+            starred[rid] = bool(e.payload.get("starred", True))
+        else:
+            t, name = e.payload.get("t"), e.payload.get("name")
+            if isinstance(t, int | float) and isinstance(name, str):
+                tricks.setdefault(rid, []).append(
+                    AnalysisEvent(t=float(t), name=name, by="user", edit_id=e.edit_id)
+                )
+    out = [
+        a.model_copy(
+            update={
+                "starred": starred.get(a.ride_id, False),
+                "tricks": sorted(tricks.get(a.ride_id, []), key=lambda ev: ev.t),
+            }
+        )
+        for a in result.rides
+    ]
+    return result.model_copy(update={"rides": out})

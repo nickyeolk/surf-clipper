@@ -104,6 +104,19 @@ fall_depth = 0.6              # compression below this at the end (with no exit)
 compare_window_s = [3.0, 0.5] # fall comparison: from end-3 s to end-0.5 s
 other_iou_max = 0.3           # crop overlapping another person more than this = unclear
 
+[score]                       # 004 best rides: defaults until the user has starred enough
+min_stars = 5                 # starred and unstarred rides needed before fitting to the stars
+l2 = 1.0                      # regularisation of the fit (few stars: keep weights small)
+
+[score.weights]               # default weight per standardised feature
+length_s = 1.0
+clean_end = 1.0
+compressions_per_10s = 0.5
+depth = 1.0
+rhythm = 0.5
+tricks = 0.5
+unclear = -1.0
+
 [riders]
 crops_per_ride = 12           # moments sampled per ride (crops of the ride's tracked person)
 keep_sharpest = 8             # ...of which the sharpest are kept

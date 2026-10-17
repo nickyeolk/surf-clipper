@@ -121,6 +121,12 @@ class AnalysisPoseConfig(_Section):
     other_iou_max: float
 
 
+class ScoreConfig(_Section):
+    weights: dict[str, float]
+    min_stars: int
+    l2: float
+
+
 class RidersConfig(_Section):
     crops_per_ride: int
     keep_sharpest: int
@@ -187,6 +193,7 @@ class Config(_Section):
     rides: RidesConfig
     riders: RidersConfig
     analysis_pose: AnalysisPoseConfig
+    score: ScoreConfig
     export: ExportConfig
     compilation: CompilationConfig
     review: ReviewConfig

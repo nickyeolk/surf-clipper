@@ -59,6 +59,7 @@ class Session(_Versioned):
     source_mtime: float
     created_at: datetime
     config_overrides: dict[str, object] = Field(default_factory=dict[str, object])
+    kind: Literal["footage", "reference"] = "footage"  # 004: an imported reference clip
     stages: dict[StageName, StageStatus] = Field(default_factory=dict[StageName, StageStatus])
 
 
@@ -390,6 +391,7 @@ class AnalysisEvent(_Model):
     depth: float | None = None  # compression at the event (1 = ride median)
     side: str | None = None
     name: str | None = None  # trick tags
+    edit_id: int | None = None  # the edit that made it (user events: undo deletes it)
     by: Literal["auto", "user"] = "auto"
 
 
@@ -409,6 +411,12 @@ class RideSummary(_Model):
     mean_depth: float | None = None
 
 
+class RideScore(_Model):
+    value: float  # 0-100, relative to the user's other rides
+    parts: dict[str, float] = Field(default_factory=dict[str, float])  # feature -> contribution
+    explanation: str = ""
+
+
 class RideAnalysis(_Model):
     ride_id: str
     span: tuple[float, float]
@@ -419,13 +427,19 @@ class RideAnalysis(_Model):
     t0: float  # time of the first analysed frame
     compression: list[float | None] = Field(default_factory=list[float | None])
     lateral: list[float | None] = Field(default_factory=list[float | None])
+    lean: list[float | None] = Field(default_factory=list[float | None])  # degrees, camera-relative
+    arms: list[float | None] = Field(default_factory=list[float | None])  # wrist gap / torso
+    stance: list[float | None] = Field(default_factory=list[float | None])  # ankle gap / torso
     turns: list[AnalysisEvent] = Field(default_factory=list[AnalysisEvent])
     pumps: list[AnalysisEvent] = Field(default_factory=list[AnalysisEvent])
     shares: RideShares = Field(default_factory=RideShares)
     ending: Ending = "unclear"
     ending_auto: Ending = "unclear"
     summary: RideSummary
-    tricks: list[AnalysisEvent] = Field(default_factory=list[AnalysisEvent])  # user trick tags
+    # filled on read from the user's edits and the fitted score (never stored by the stage)
+    tricks: list[AnalysisEvent] = Field(default_factory=list[AnalysisEvent])
+    starred: bool = False
+    score: RideScore | None = None
 
 
 class AnalysisFile(_Versioned):

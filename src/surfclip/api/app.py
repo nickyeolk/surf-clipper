@@ -21,6 +21,9 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from surfclip.analysis.pose import read_keypoints
+from surfclip.analysis.score import apply_scores
+from surfclip.analysis.service import KEYPOINT_DIR, read_analysis, with_user_edits
 from surfclip.api.jobs import Job, Jobs, Report
 from surfclip.config import DEFAULT_CONFIG_PATH, load_config
 from surfclip.edits.apply import RIDER_OPS, undone_ids
@@ -37,6 +40,7 @@ from surfclip.media.compile import (
     find_rider,
     read_compilations,
 )
+from surfclip.media.decode import output_size
 from surfclip.media.export import (
     export_reel,
     export_rides,
@@ -58,7 +62,9 @@ from surfclip.riders.service import refresh_riders
 from surfclip.riders.session import RIDERS_FILE, load_appearance, ride_key
 from surfclip.riders.stills import rider_still, still_path
 from surfclip.rides.evidence import Obs
+from surfclip.stages import default_pipeline
 from surfclip.store.schemas import (
+    AnalysisFile,
     AutoJoins,
     EditTarget,
     Ride,
@@ -142,6 +148,17 @@ class RiderEditRequest(BaseModel):
     name: str | None = None
     not_name: str | None = None
     ignore: bool = True
+
+
+class StarRequest(BaseModel):
+    ride_id: str
+    starred: bool = True
+
+
+class TrickRequest(BaseModel):
+    ride_id: str
+    t: float
+    name: str
 
 
 class StillRequest(BaseModel):
@@ -958,6 +975,133 @@ def create_app(
             "unassigned": [clip(r) for r in exported if r.ride_id not in placed],
             "stills": [still_json(sid, s) for s in read_stills(store).stills],
         }
+
+    # ---- 004: ride analysis ------------------------------------------------------------------
+    def analysis_of(sid: str) -> AnalysisFile:
+        store = store_of(sid)
+        result = read_analysis(store)
+        if result is None:
+            raise ApiError(
+                404, "not_analysed", "rides not analysed yet: name yourself, then analyse"
+            )
+        cfg = load_config(config_path, store.session.config_overrides)
+        return apply_scores(with_user_edits(store, result), artifacts, cfg.score)
+
+    @app.get("/api/sessions/{sid}/analysis")
+    def get_analysis(sid: str) -> AnalysisFile:
+        return analysis_of(sid)
+
+    @app.post("/api/sessions/{sid}/analysis")
+    def post_analysis(sid: str) -> Job:
+        store = store_of(sid)
+        running = work_jobs.active(sid, "analysis")
+        if running is not None:
+            return running
+        cfg = load_config(config_path, store.session.config_overrides)
+
+        def work(report: Report) -> dict[str, object]:
+            default_pipeline().run(
+                store, cfg, until="analysis", progress=lambda _s, f, m: report(f, m)
+            )
+            result = read_analysis(store)
+            return {"rides": len(result.rides) if result else 0}
+
+        return work_jobs.submit("analysis", sid, work)
+
+    @app.get("/api/sessions/{sid}/analysis/{ride_id}/keypoints")
+    def get_keypoints(sid: str, ride_id: str) -> dict[str, Any]:
+        """Keypoints in review-copy pixels (what the browser plays), with the crop box."""
+        store = store_of(sid)
+        path = store.path(f"{KEYPOINT_DIR}/{ride_id}.parquet")
+        if not ride_id.replace("_", "").isalnum() or not path.exists():
+            raise ApiError(404, "not_analysed", f"ride {ride_id} has no keypoints")
+        info: SourceInfo = read(folder(sid) / "probe.json", SourceInfo)
+        cfg = load_config(config_path, store.session.config_overrides)
+        _, full_h = output_size(info, max(info.width, info.height))
+        w, h = output_size(info, cfg.review.height)
+        s = h / full_h
+        kp = read_keypoints(path)
+
+        def r(v: float) -> float | None:
+            return round(v * s, 1) if v == v else None  # NaN -> null
+
+        frames = [
+            {
+                "t": round(float(t), 3),
+                "box": [r(float(v)) for v in box],
+                "kp": [[r(float(x)), r(float(y)), round(float(c), 2) if c == c else 0.0]
+                       for x, y, c in k],
+            }
+            for t, box, k in zip(kp.t, kp.box, kp.kp, strict=True)
+        ]  # fmt: skip
+        return {"fps": cfg.analysis_pose.fps, "width": w, "height": h, "frames": frames}
+
+    def ride_spans(sid: str, ride_id: str) -> dict[str, list[float]]:
+        rides: Rides = read(folder(sid) / "rides.json", Rides)
+        ride = next((r for r in rides.rides if r.ride_id == ride_id), None)
+        if ride is None:
+            raise ApiError(404, "ride_not_found", f"no ride {ride_id}")
+        return {ride_id: [ride.start_s, ride.end_s]}
+
+    @app.post("/api/sessions/{sid}/stars")
+    def post_star(sid: str, req: StarRequest) -> dict[str, Any]:
+        store = store_of(sid)
+        with write_lock:
+            payload: dict[str, object] = {
+                "starred": req.starred,
+                "spans": ride_spans(sid, req.ride_id),
+            }
+            append_edit(store, "ride_star", EditTarget(ride_id=req.ride_id), payload)
+        return {"ride_id": req.ride_id, "starred": req.starred}
+
+    @app.post("/api/sessions/{sid}/tricks")
+    def post_trick(sid: str, req: TrickRequest) -> dict[str, Any]:
+        name = req.name.strip()
+        if not name:
+            raise ApiError(400, "no_name", "give the trick a name")
+        store = store_of(sid)
+        with write_lock:
+            payload: dict[str, object] = {
+                "t": req.t,
+                "name": name,
+                "spans": ride_spans(sid, req.ride_id),
+            }
+            edit = append_edit(store, "trick_tag", EditTarget(ride_id=req.ride_id), payload)
+        return {"edit_id": edit.edit_id, "ride_id": req.ride_id, "t": req.t, "name": name}
+
+    @app.delete("/api/sessions/{sid}/tricks/{edit_id}", status_code=204)
+    def delete_trick(sid: str, edit_id: int) -> Response:
+        """Remove a tag: an undo of the tag edit (tags never change rides, so no rebuild)."""
+        store = store_of(sid)
+        with write_lock:
+            edits = read_edits(store)
+            undone = undone_ids(edits)
+            tag = next((e for e in edits.edits if e.edit_id == edit_id), None)
+            if tag is None or tag.op != "trick_tag" or edit_id in undone:
+                raise ApiError(404, "tag_not_found", f"no trick tag {edit_id}")
+            append_edit(store, "undo", EditTarget(), {"edit_id": edit_id})
+        return Response(status_code=204)
+
+    @app.get("/api/tricks")
+    def get_tricks(name: str | None = None) -> list[dict[str, Any]]:
+        """Trick tags across sessions (rides of every session; names typed by the user)."""
+        out: list[dict[str, Any]] = []
+        for path in sorted(artifacts.glob("*/analysis.json")):
+            sid = path.parent.name
+            try:
+                result = with_user_edits(
+                    store_of(sid), read_analysis(store_of(sid)) or AnalysisFile(session_id=sid)
+                )
+            except ApiError:
+                continue
+            video = Path(session_of(sid).source_path).name
+            for a in result.rides:
+                for tr in a.tricks:
+                    if name is None or (tr.name or "").lower() == name.lower():
+                        out.append({"session_id": sid, "video": video, "ride_id": a.ride_id,
+                                    "t": tr.t, "name": tr.name, "rider": a.rider,
+                                    "edit_id": tr.edit_id})  # fmt: skip
+        return out
 
     # ---- 003: start and stop without a terminal (research R5, R6) ---------------------------
     @app.get("/api/health")

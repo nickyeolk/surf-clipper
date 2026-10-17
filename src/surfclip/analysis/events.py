@@ -25,6 +25,7 @@ from surfclip.analysis.signals import (
     R_ANK,
     R_SH,
     compression,
+    measures,
     smooth,
     smooth_rotation,
     unclear_mask,
@@ -117,14 +118,20 @@ def find_events(
     return turns, pumps
 
 
-def shares(n: int, unclear: np.ndarray[Any, np.dtype[np.bool_]], turns: list[AnalysisEvent],
-           pumps: list[AnalysisEvent], fps: float, t0: float) -> RideShares:  # fmt: skip
+def shares(
+    n: int,
+    unclear: np.ndarray[Any, np.dtype[np.bool_]],
+    turns: list[AnalysisEvent],
+    pumps: list[AnalysisEvent],
+    fps: float,
+    t0: float,
+) -> RideShares:
     if n == 0:
         return RideShares()
     state = np.zeros(n, dtype=int)  # 0 trimming, 1 pumping, 2 turning
     for evs, half, code in ((pumps, PUMP_HALF_S, 1), (turns, TURN_HALF_S, 2)):
         for e in evs:
-            i = int(round((e.t - t0) * fps))
+            i = round((e.t - t0) * fps)
             lo, hi = max(0, i - int(half * fps)), min(n, i + int(half * fps) + 1)
             state[lo:hi] = np.maximum(state[lo:hi], code)
     clear = ~unclear
@@ -148,8 +155,13 @@ def body_tilt_deg(kp: Keypoints) -> FloatArray:
     return np.degrees(np.arctan2(np.abs(d[:, 0]), np.abs(d[:, 1])))
 
 
-def ending(comp: FloatArray, lat: FloatArray, tilt: FloatArray,
-           unclear: np.ndarray[Any, np.dtype[np.bool_]], cfg: AnalysisPoseConfig) -> Ending:  # fmt: skip
+def ending(
+    comp: FloatArray,
+    lat: FloatArray,
+    tilt: FloatArray,
+    unclear: np.ndarray[Any, np.dtype[np.bool_]],
+    cfg: AnalysisPoseConfig,
+) -> Ending:
     k = max(3, int(cfg.fall_window_s * cfg.fps))
     c_end, t_end, u_end = comp[-k:], tilt[-k:], lat[-k:]
     seen = np.isfinite(c_end) & ~unclear[-k:]
@@ -167,8 +179,16 @@ def ending(comp: FloatArray, lat: FloatArray, tilt: FloatArray,
     return "unclear"
 
 
-def analyse_ride(store: SessionStore, ride: Ride, kp: Keypoints, cfg: Config, *, rider: str,
-                 cache_key: str, keypoints_key: str) -> RideAnalysis:  # fmt: skip
+def analyse_ride(
+    store: SessionStore,
+    ride: Ride,
+    kp: Keypoints,
+    cfg: Config,
+    *,
+    rider: str,
+    cache_key: str,
+    keypoints_key: str,
+) -> RideAnalysis:
     p = cfg.analysis_pose
     t0 = float(kp.t[0]) if len(kp) else ride.start_s
     unclear = unclear_mask(kp, p) if len(kp) else np.zeros(0, dtype=bool)
@@ -176,6 +196,7 @@ def analyse_ride(store: SessionStore, ride: Ride, kp: Keypoints, cfg: Config, *,
     lat = lateral(store, kp, p)
     rot = smooth_rotation(kp, p) if len(kp) else np.zeros(0)
     turns, pumps = find_events(comp, lat, rot, p, t0)
+    body = measures(kp, p) if len(kp) else {k: np.zeros(0) for k in ("lean", "arms", "stance")}
     end = ending(comp, lat, body_tilt_deg(kp), unclear, p) if len(kp) else "unclear"
     events = sorted(e.t for e in turns + pumps)
     gaps = np.diff(events)
@@ -202,6 +223,9 @@ def analyse_ride(store: SessionStore, ride: Ride, kp: Keypoints, cfg: Config, *,
         t0=round(t0, 3),
         compression=rounded(comp),
         lateral=rounded(lat),
+        lean=rounded(body["lean"]),
+        arms=rounded(body["arms"]),
+        stance=rounded(body["stance"]),
         turns=turns,
         pumps=pumps,
         shares=shares(len(kp), unclear, turns, pumps, p.fps, t0),

@@ -113,3 +113,24 @@ def test_crop_and_rider_picking() -> None:
     assert crop_box(np.array([100.0, 100, 150, 200]), 0.3, (160, 400)) == (70, 70, 160, 230)
     assert pick_rider(np.array([[10.0, 10], [50, 60]]), (100, 120)) == 1
     assert pick_rider(np.zeros((0, 2)), (100, 120)) is None
+
+
+def test_measures_are_body_relative_and_lean_mirrors() -> None:
+    from surfclip.analysis.signals import raw_arms, raw_lean, raw_stance
+
+    def leaning(scale: float, mirror: float) -> Keypoints:
+        k = _keypoints([0.3], scale=scale)
+        k.kp[0, 5, 0] += 30 * scale  # shoulders shifted right: leaning right
+        k.kp[0, 6, 0] += 30 * scale
+        k.kp[0, 9, :2] = (60 * scale, 150)
+        k.kp[0, 10, :2] = (160 * scale, 150)
+        if mirror < 0:
+            k.kp[0, :, 0] = 1000 - k.kp[0, :, 0]
+        return k
+
+    near, far, mirrored = leaning(3.0, 1), leaning(0.5, 1), leaning(3.0, -1)
+    assert raw_lean(near)[0] == pytest.approx(raw_lean(far)[0], abs=1e-6)
+    assert raw_lean(near)[0] > 0 and raw_lean(mirrored)[0] == pytest.approx(-raw_lean(near)[0])
+    for f in (raw_stance,):
+        assert f(near)[0] == pytest.approx(f(far)[0]) == pytest.approx(f(mirrored)[0])
+    assert raw_arms(near)[0] == pytest.approx(raw_arms(mirrored)[0])
