@@ -22,8 +22,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from surfclip.analysis.pose import read_keypoints
+from surfclip.analysis.reference import choose_surfer, people_at, read_reference
 from surfclip.analysis.score import apply_scores
-from surfclip.analysis.service import KEYPOINT_DIR, read_analysis, with_user_edits
+from surfclip.analysis.service import (
+    KEYPOINT_DIR,
+    analyse_session,
+    read_analysis,
+    with_user_edits,
+)
 from surfclip.api.jobs import Job, Jobs, Report
 from surfclip.config import DEFAULT_CONFIG_PATH, load_config
 from surfclip.edits.apply import RIDER_OPS, undone_ids
@@ -165,6 +171,16 @@ class StillRequest(BaseModel):
     t_s: float  # source time (the review player's time, or a clip's start + its time)
 
 
+class ReferenceRequest(BaseModel):
+    source_path: str
+
+
+class SurferRequest(BaseModel):
+    t: float  # seconds, and the click in source display pixels (the keyframe's pixels)
+    x: float
+    y: float
+
+
 class AddSessionRequest(BaseModel):
     source_path: str
     min_length_s: float | None = None
@@ -271,6 +287,8 @@ def create_app(
         out: list[SessionSummary] = []
         for record in sorted(artifacts.glob("*/session.json")):
             s = Session.model_validate_json(record.read_text(encoding="utf-8"))
+            if s.kind == "reference":  # listed under /api/references
+                continue
             root = record.parent
             info = (
                 SourceInfo.model_validate_json((root / "probe.json").read_text(encoding="utf-8"))
@@ -827,8 +845,9 @@ def create_app(
                 ids = sorted(rider_ride_ids(riders, req.rider))
                 if req.reel:  # 003: one rider's reel is the captioned compilation
                     path = export_compilation(
-                        store, cfg.export, cfg.compilation, riders, req.rider, progress=progress
-                    )
+                        store, cfg.export, cfg.compilation, riders, req.rider,
+                        ride_ids=req.rides, progress=progress,
+                    )  # fmt: skip
                     return {"reel": str(path), "folder": str(store.path("clips"))}
             if req.reel:
                 reel = export_reel(
@@ -1102,6 +1121,97 @@ def create_app(
                                     "t": tr.t, "name": tr.name, "rider": a.rider,
                                     "edit_id": tr.edit_id})  # fmt: skip
         return out
+
+    # ---- 004: reference clips -----------------------------------------------------------------
+    def reference_store(sid: str) -> SessionStore:
+        store = store_of(sid)
+        if store.session.kind != "reference":
+            raise ApiError(404, "not_a_reference", f"{sid} is not a reference clip")
+        return store
+
+    @app.get("/api/references")
+    def list_references() -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for record in sorted(artifacts.glob("*/session.json")):
+            s = Session.model_validate_json(record.read_text(encoding="utf-8"))
+            if s.kind != "reference":
+                continue
+            store = SessionStore(record.parent, s)
+            job = work_jobs.active(s.session_id, "import") or work_jobs.active(
+                s.session_id, "analysis"
+            )
+            tracked = store.path("tracks.parquet").exists()
+            ref = read_reference(store)
+            analysed = read_analysis(store) is not None and ref is not None
+            info = (
+                read(record.parent / "probe.json", SourceInfo)
+                if store.path("probe.json").exists()
+                else None
+            )
+            status = "working" if job else "ready" if analysed else "pick" if tracked else "failed"
+            out.append({
+                "session_id": s.session_id, "video": Path(s.source_path).name, "status": status,
+                "job": job.model_dump(mode="json") if job else None,
+                "duration_s": info.duration_s if info else None,
+                "picked_at": list(ref.picked_at) if ref else None,
+            })  # fmt: skip
+        return out
+
+    @app.post("/api/references")
+    def add_reference(req: ReferenceRequest) -> dict[str, Any]:
+        """Import a clip as a reference: probe, review copy, detect and track (no zone)."""
+        try:
+            source = allowed_source(Path(req.source_path), source_dirs())
+            store = SessionStore.open(source, artifacts)
+        except (SourceNotAllowedError, SourceLocationError) as exc:
+            raise ApiError(400, "source_not_allowed", str(exc)) from exc
+        sid = store.session.session_id
+        if store.session.kind != "reference":
+            if store.path("rides.json").exists():
+                raise ApiError(409, "is_a_session", "this video is already one of your sessions")
+            store.session.kind = "reference"
+            store.save()
+        cfg = load_config(config_path, store.session.config_overrides)
+
+        def work(report: Report) -> dict[str, object]:
+            default_pipeline().run(
+                store, cfg, until="track", progress=lambda _s, f, m: report(f, m)
+            )
+            return {"next": "pick the surfer"}
+
+        job = work_jobs.active(sid, "import") or work_jobs.submit("import", sid, work)
+        return {"session_id": sid, "job": job.model_dump(mode="json")}
+
+    @app.get("/api/references/{sid}/people")
+    def reference_people(sid: str, t: float) -> dict[str, Any]:
+        """People at time t, in the keyframe's (source display) pixels, to click on."""
+        from surfclip.stages import session_observations
+
+        store = reference_store(sid)
+        if not store.path("tracks.parquet").exists():
+            raise ApiError(409, "not_tracked", "the clip is still being imported")
+        info: SourceInfo = read(folder(sid) / "probe.json", SourceInfo)
+        w, h = output_size(info, max(info.width, info.height))
+        people = people_at(session_observations(store), t)
+        boxes = [{"track_id": o.track_id, "box": [round(v, 1) for v in o.box]} for o in people]
+        return {"t": t, "width": w, "height": h, "people": boxes}
+
+    @app.post("/api/references/{sid}/surfer")
+    def reference_surfer(sid: str, req: SurferRequest) -> Job:
+        from surfclip.stages import session_observations
+
+        store = reference_store(sid)
+        try:
+            choose_surfer(store, session_observations(store), req.t, req.x, req.y)
+        except ValueError as exc:
+            raise ApiError(400, "nobody_there", str(exc)) from exc
+        cfg = load_config(config_path, store.session.config_overrides)
+
+        def work(report: Report) -> dict[str, object]:
+            analyse_session(store, cfg, progress=report)
+            return {"analysed": True}
+
+        return work_jobs.active(sid, "analysis") or work_jobs.submit("analysis", sid, work)
 
     # ---- 003: start and stop without a terminal (research R5, R6) ---------------------------
     @app.get("/api/health")

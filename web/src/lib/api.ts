@@ -293,6 +293,22 @@ export interface TrickTag {
   edit_id: number
 }
 
+export interface ReferenceClip {
+  session_id: string
+  video: string
+  status: 'working' | 'pick' | 'ready' | 'failed'
+  job: Job | null
+  duration_s: number | null
+  picked_at: [number, number, number] | null
+}
+
+export interface People {
+  t: number
+  width: number
+  height: number
+  people: { track_id: number; box: number[] }[]
+}
+
 export interface DeletedRide {
   edit_id: number
   ride_id: string
@@ -451,6 +467,12 @@ export const api = {
     call<TrickTag>(`/sessions/${id}/tricks`, { method: 'POST', body: JSON.stringify({ ride_id: rideId, t, name }) }),
   deleteTrick: (id: string, editId: number) => fetch(`/api/sessions/${id}/tricks/${editId}`, { method: 'DELETE' }),
   tricks: (name?: string) => call<TrickTag[]>(`/tricks${name ? `?name=${encodeURIComponent(name)}` : ''}`),
+  references: () => call<ReferenceClip[]>('/references'),
+  addReference: (sourcePath: string) =>
+    call<{ session_id: string; job: Job }>('/references', { method: 'POST', body: JSON.stringify({ source_path: sourcePath }) }),
+  people: (id: string, t: number) => call<People>(`/references/${id}/people?t=${t}`),
+  pickSurfer: (id: string, t: number, x: number, y: number) =>
+    call<Job>(`/references/${id}/surfer`, { method: 'POST', body: JSON.stringify({ t, x, y }) }),
   deleted: (id: string) => call<DeletedRide[]>(`/sessions/${id}/deleted`),
   restore: (id: string, editIds: number[] | null) =>
     call<{ restored: number[]; rides: Rides }>(`/sessions/${id}/restore`, {

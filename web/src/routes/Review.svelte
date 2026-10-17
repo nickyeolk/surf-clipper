@@ -381,6 +381,25 @@
     }
   }
 
+  // 004: tag a trick at the playhead (on the selected ride); names are free text
+  let lastTrick = $state('')
+  async function tagTrick() {
+    if (!selRide) {
+      status = 'select a ride first'
+      return
+    }
+    video?.pause()
+    const name = prompt(`Trick at ${clock(current)}? (e.g. floater, 360)`, lastTrick)?.trim()
+    if (!name) return
+    try {
+      await api.addTrick(sessionId, selRide.ride_id, current, name)
+      lastTrick = name
+      status = `tagged ${name} at ${clock(current)}`
+    } catch (e) {
+      status = `not tagged: ${(e as Error).message}`
+    }
+  }
+
   // 003: save the frame on screen as a full-resolution still (the player's time is source time)
   let saved = $state<StillInfo | null>(null)
   async function saveStill() {
@@ -413,6 +432,7 @@
     else if (k === 'n') addRide()
     else if (k === 'u') undo()
     else if (k === 'c') void saveStill()
+    else if (k === 'g') void tagTrick()
     else if (k === 'r') startReel()
     else if (k === ',' && reel) goReel(Math.max(0, reelIdx - 1), !paused)
     else if (k === '.' && reel) goReel(Math.min(rideList.length - 1, reelIdx + 1), !paused)
@@ -589,6 +609,8 @@
             <button onclick={mergeNext} title="Merge with the next ride (m)">merge next</button>
             <button class="no" onclick={remove} title="Delete (x)">delete</button>
             <button onclick={() => exportClips([selRide!.ride_id])} title="Export only this clip">export</button>
+            <button onclick={tagTrick} title="Tag a trick at the playhead (g)">tag trick</button>
+            <a href={`#/compare?a=${sessionId}:${selRide.ride_id}`} title="Side by side with another surfer">compare</a>
             {#if selRide.export}
               <a href={api.clipUrl(sessionId, selRide.ride_id)} target="_blank" rel="noreferrer">open clip ↗</a>
             {/if}

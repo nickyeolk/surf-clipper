@@ -51,6 +51,15 @@
           /* not analysed */
         }
       }
+      for (const r of await api.references().catch(() => [])) {
+        if (r.status !== 'ready') continue
+        try {
+          const an = await api.analysis(r.session_id)
+          for (const ride of an.rides) out.push({ sid: r.session_id, video: `reference: ${r.video}`, ride })
+        } catch {
+          /* not analysed */
+        }
+      }
       options = out
       tricks = await api.tricks().catch(() => [])
       loading = false

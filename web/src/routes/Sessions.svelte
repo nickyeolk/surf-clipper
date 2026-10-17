@@ -1,7 +1,7 @@
 <script lang="ts">
   // Sessions: add a video from the footage folder, follow its processing, then go to the next
   // step (zone, then review). Polls while anything is processing.
-  import { api, clock, type Health, type Job, type SessionSummary, type SourceVideo } from '../lib/api'
+  import { api, clock, type Health, type Job, type ReferenceClip, type SessionSummary, type SourceVideo } from '../lib/api'
 
   let sessions = $state<SessionSummary[] | null>(null)
   let sources = $state<SourceVideo[]>([])
@@ -40,9 +40,37 @@
     stopped = true
   }
 
+  // 004: ride analysis per session, and reference clips (surfers to compare with)
+  let analyseJobs = $state<Record<string, Job>>({})
+  let references = $state<ReferenceClip[]>([])
+  let refChosen = $state('')
+  async function analyse(sid: string) {
+    try {
+      let job = await api.runAnalysis(sid)
+      analyseJobs[sid] = job
+      while (job.status === 'queued' || job.status === 'running') {
+        await new Promise((r) => setTimeout(r, 1500))
+        job = await api.job(job.job_id)
+        analyseJobs[sid] = job
+      }
+    } catch (e) {
+      addError = (e as Error).message
+    }
+  }
+  async function addReference() {
+    if (!refChosen) return
+    try {
+      const r = await api.addReference(refChosen)
+      refChosen = ''
+      location.hash = `#/reference/${r.session_id}`
+    } catch (e) {
+      addError = (e as Error).message
+    }
+  }
+
   async function load() {
     try {
-      ;[sessions, sources] = await Promise.all([api.sessions(), api.sources()])
+      ;[sessions, sources, references] = await Promise.all([api.sessions(), api.sources(), api.references()])
     } catch (e) {
       error = (e as Error).message
     }
@@ -50,7 +78,7 @@
   $effect(() => {
     void load()
     const timer = setInterval(() => {
-      if (sessions?.some((s) => s.job)) void load()
+      if (sessions?.some((s) => s.job) || references.some((r) => r.status === 'working')) void load()
     }, 2000)
     return () => clearInterval(timer)
   })
@@ -76,6 +104,10 @@
 
 <div class="title">
   <h1>Sessions</h1>
+  <span class="row">
+    <a class="button secondary" href="#/compare" title="Your ride side by side with another surfer">Compare</a>
+    <a class="button secondary" href="#/tricks" title="Tricks you tagged, by name">Tricks</a>
+  </span>
   {#if !stopped}<button class="stop" onclick={stop} title="Stop the tool (start it again from the desktop shortcut)">Stop</button>{/if}
 </div>
 
@@ -180,6 +212,14 @@
                   <a class="button" href={`#/riders/${s.session_id}`}>Riders</a>
                   <a class="button secondary" href={`#/viewer/${s.session_id}`}
                     title="Watch exported clips and compilations at full quality; saved stills">Exports</a>
+                  {#if analyseJobs[s.session_id] && ['queued', 'running'].includes(analyseJobs[s.session_id].status)}
+                    <span class="small">analysing <progress max="1" value={analyseJobs[s.session_id].progress}></progress></span>
+                  {:else}
+                    <button class="secondary" onclick={() => analyse(s.session_id)}
+                      title="Body positions on the rides of riders you named (needed for Compare and Best)">Analyse rides</button>
+                  {/if}
+                  {#if analyseJobs[s.session_id]?.status === 'failed'}<span class="error small">{analyseJobs[s.session_id].error}</span>{/if}
+                  <a class="button secondary" href={`#/best/${s.session_id}`} title="Your rides by score; star the ones you love">Best</a>
                   <a class="button secondary" href={`#/label/${s.session_id}`}>Label</a>
                   {#if s.labels_final}
                     <a class="button secondary" href={`#/rider-labels/${s.session_id}`}
@@ -188,6 +228,42 @@
                 {:else}
                   <span class="muted small">not analysed</span>
                 {/if}
+              {/if}
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  {/if}
+
+  <h2>Reference clips</h2>
+  <p class="small muted">Surfers whose style you want to compare with: a clip from your footage folder (a pro's video, a friend's phone footage).</p>
+  <div class="add">
+    <select bind:value={refChosen} disabled={newSources.length === 0}>
+      <option value="">{newSources.length ? 'choose a clip…' : 'no new videos in the footage folder'}</option>
+      {#each newSources as s (s.path)}
+        <option value={s.path}>{s.name}</option>
+      {/each}
+    </select>
+    <button class="primary" disabled={!refChosen} onclick={addReference}>Import as reference</button>
+  </div>
+  {#if references.length}
+    <table class="sessions">
+      <tbody>
+        {#each references as r (r.session_id)}
+          <tr>
+            <td>{r.video}</td>
+            <td>{r.duration_s ? clock(r.duration_s).replace(/\.\d+$/, '') : '–'}</td>
+            <td class="actions">
+              {#if r.status === 'working'}
+                <progress max="1" value={r.job?.progress ?? 0}></progress> <span class="small">{r.job?.message}</span>
+              {:else if r.status === 'pick'}
+                <a class="button" href={`#/reference/${r.session_id}`}>Pick the surfer →</a>
+              {:else if r.status === 'ready'}
+                <a class="button" href={`#/compare?b=${r.session_id}:ref`}>Compare</a>
+                <a class="button secondary" href={`#/reference/${r.session_id}`}>Change surfer</a>
+              {:else}
+                <span class="error small">import failed</span>
               {/if}
             </td>
           </tr>

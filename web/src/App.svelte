@@ -7,6 +7,9 @@
   import Riders from './routes/Riders.svelte'
   import Viewer from './routes/Viewer.svelte'
   import Compare from './routes/Compare.svelte'
+  import Reference from './routes/Reference.svelte'
+  import Best from './routes/Best.svelte'
+  import Tricks from './routes/Tricks.svelte'
 
   let hash = $state(location.hash)
   $effect(() => {
@@ -38,6 +41,16 @@
   {:else if route[0] === 'review' && route[1]}
     {#key route.join('/')}
       <Review sessionId={route[1]} rider={route[2] === 'rider' && route[3] ? decodeURIComponent(route[3]) : undefined} />
+    {/key}
+  {:else if route[0] === 'tricks'}
+    <Tricks />
+  {:else if route[0] === 'best' && route[1]}
+    {#key route[1]}
+      <Best sessionId={route[1]} />
+    {/key}
+  {:else if route[0] === 'reference' && route[1]}
+    {#key route[1]}
+      <Reference sessionId={route[1]} />
     {/key}
   {:else if route[0] === 'compare'}
     <Compare {query} />

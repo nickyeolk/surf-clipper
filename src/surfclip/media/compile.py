@@ -159,17 +159,23 @@ def export_compilation(
     riders: Riders,
     rider: str,
     *,
+    ride_ids: list[str] | None = None,
     cpu: bool = False,
     progress: Callable[[int, int, str], None] | None = None,
 ) -> Path:
-    """One video of the rider's rides in time order, each captioned for its first seconds.
+    """One video of the rider's rides (or the chosen ones) in time order, each captioned for its
+    first seconds. A chosen subset is its own compilation, "<rider> best".
 
-    Segments whose span, caption and settings are unchanged are reused (FR-007)."""
-    label, ride_ids = find_rider(riders, rider)
+    Segments are cached by span, caption and settings, so unchanged ones are reused (FR-007)
+    and a subset's captions ("ride 2 of 5") never overwrite the full compilation's."""
+    label, all_ids = find_rider(riders, rider)
+    wanted = None if ride_ids is None else set(ride_ids)
+    chosen = [i for i in all_ids if wanted is None or i in wanted]
+    name = label if ride_ids is None else f"{label} best"
     info = source_info(store)
     rides = store.read_model("rides.json", Rides)
     by_id = {r.ride_id: r for r in rides.rides}
-    caps = captions(rides, label, ride_ids)
+    caps = captions(rides, label, chosen)
     if not caps:
         raise RuntimeError(f"{label} has no rides")
     use_cpu = _use_cpu(export_cfg, cpu)
@@ -177,13 +183,14 @@ def export_compilation(
     text_dir = store.path(SEGMENT_DIR)
     text_dir.mkdir(parents=True, exist_ok=True)
     entries: list[CompilationRide] = []
+    keys: list[str] = []
     offset = 0.0
     for i, cap in enumerate(caps, start=1):
         ride = by_id[cap.ride_id]
         key = segment_key(info, ride, export_cfg, cfg, use_cpu, cap.text)
-        rel = f"{SEGMENT_DIR}/{cap.ride_id}.mp4"
-        seg = comps.segments.get(cap.ride_id)
-        if seg is None or seg.cache_key != key or not store.path(rel).exists():
+        rel = f"{SEGMENT_DIR}/{cap.ride_id}_{key}.mp4"
+        seg = comps.segments.get(key)
+        if seg is None or not store.path(seg.path).exists():
             if progress:
                 progress(i, len(caps), cap.ride_id)
             text_file = text_dir / f"{cap.ride_id}.txt"
@@ -199,8 +206,9 @@ def export_compilation(
                 span=(round(ride.clip_start_s, 4), round(ride.clip_end_s, 4)),
                 duration_s=duration_of(store.path(rel)),
             )
-            comps.segments[cap.ride_id] = seg
+            comps.segments[key] = seg
             store.write_model(COMPILATIONS_FILE, comps)
+        keys.append(key)
         entries.append(
             CompilationRide(
                 ride_id=cap.ride_id,
@@ -213,13 +221,22 @@ def export_compilation(
         offset += seg.duration_s
     if progress:
         progress(len(caps), len(caps), "joining")
-    out_rel = reel_file(label)
-    _concat(store.path(out_rel), [store.path(comps.segments[e.ride_id].path) for e in entries])
-    comps.compilations[label] = Compilation(
-        rider=label, path=out_rel, made_at=datetime.now(UTC), rides=entries
-    )
+    out_rel = reel_file(name)
+    _concat(store.path(out_rel), [store.path(comps.segments[k].path) for k in keys])
+    comps.compilations[name] = Compilation(
+        rider=label, path=out_rel, made_at=datetime.now(UTC), rides=entries,
+        ride_ids=None if ride_ids is None else chosen, segment_keys=keys,
+    )  # fmt: skip
+    _prune(store, comps)
     store.write_model(COMPILATIONS_FILE, comps)
     return store.path(out_rel)
+
+
+def _prune(store: SessionStore, comps: Compilations) -> None:
+    """Drop captioned segments no compilation uses any more (e.g. after a rename)."""
+    used = {k for c in comps.compilations.values() for k in c.segment_keys}
+    for key in [k for k in comps.segments if k not in used]:
+        store.path(comps.segments.pop(key).path).unlink(missing_ok=True)
 
 
 def _concat(out: Path, parts: list[Path]) -> None:
@@ -246,19 +263,21 @@ def compilation_current(
     export_cfg: ExportConfig,
     cfg: CompilationConfig,
     riders: Riders,
-    label: str,
+    name: str,
     *,
     cpu: bool = False,
 ) -> bool:
-    """True when the rider's compilation exists and matches their current rides and captions."""
+    """True when the compilation exists and matches its rider's current rides and captions."""
     comps = read_compilations(store)
-    comp = comps.compilations.get(label)
+    comp = comps.compilations.get(name)
     if comp is None or not store.path(comp.path).exists():
         return False
+    label = comp.rider
     try:
-        _, ride_ids = find_rider(riders, label)
+        _, all_ids = find_rider(riders, label)
     except KeyError:
         return False
+    ride_ids = [i for i in all_ids if comp.ride_ids is None or i in comp.ride_ids]
     info = store.read_model("probe.json", SourceInfo)
     rides = store.read_model("rides.json", Rides)
     by_id = {r.ride_id: r for r in rides.rides}
@@ -266,9 +285,5 @@ def compilation_current(
     if [c.ride_id for c in caps] != [r.ride_id for r in comp.rides]:
         return False
     use_cpu = _use_cpu(export_cfg, cpu)
-    for cap in caps:
-        seg = comps.segments.get(cap.ride_id)
-        key = segment_key(info, by_id[cap.ride_id], export_cfg, cfg, use_cpu, cap.text)
-        if seg is None or seg.cache_key != key:
-            return False
-    return True
+    keys = [segment_key(info, by_id[c.ride_id], export_cfg, cfg, use_cpu, c.text) for c in caps]
+    return keys == comp.segment_keys and all(k in comps.segments for k in keys)

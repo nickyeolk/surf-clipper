@@ -123,7 +123,8 @@ def test_hlg_compilation(tmp_path: Path) -> None:
 def test_segments_cached_and_recaptioned_on_rename(tmp_path: Path) -> None:
     store = _store(tmp_path, _source(tmp_path, hdr=False))
     export_compilation(store, CFG.export, CFG.compilation, _riders("me"), "me", cpu=True)
-    seg = store.path("clips/captioned/r000060.mp4")
+    comps = read_compilations(store)
+    seg = store.path(comps.segments[comps.compilations["me"].segment_keys[0]].path)
     first = seg.stat().st_mtime_ns
     calls: list[str] = []
     export_compilation(
@@ -132,8 +133,18 @@ def test_segments_cached_and_recaptioned_on_rename(tmp_path: Path) -> None:
     )  # fmt: skip
     assert calls == ["joining"] and seg.stat().st_mtime_ns == first
     export_compilation(store, CFG.export, CFG.compilation, _riders("jo"), "jo", cpu=True)
-    assert seg.stat().st_mtime_ns != first
     assert store.path("clips/reel_jo.mp4").exists()
+    comps = read_compilations(store)
+    assert comps.compilations["jo"].rides[0].caption.startswith("jo · ride 1 of 3")
+    # a chosen subset is its own compilation; it doesn't disturb the full one
+    export_compilation(store, CFG.export, CFG.compilation, _riders("jo"), "jo", cpu=True,
+                       ride_ids=["r000060", "r000600"])  # fmt: skip
+    comps = read_compilations(store)
+    best = comps.compilations["jo best"]
+    assert [r.caption for r in best.rides] == ["jo · ride 1 of 2 · 0:02", "jo · ride 2 of 2 · 0:20"]
+    assert store.path("clips/reel_jo_best.mp4").exists()
+    assert all(k in comps.segments for k in comps.compilations["jo"].segment_keys)
+    assert "me" in comps.compilations and seg.exists()  # still used by "me"
 
 
 def _frame(src: Path, n: int, hdr: bool) -> np.ndarray:

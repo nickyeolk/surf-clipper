@@ -358,6 +358,8 @@ class Compilation(_Model):
     path: str
     made_at: datetime
     rides: list[CompilationRide]
+    ride_ids: list[str] | None = None  # a chosen subset (004 best rides); None = all the rider's
+    segment_keys: list[str] = Field(default_factory=list[str])
 
 
 class Compilations(_Versioned):

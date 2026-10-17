@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from collections.abc import Callable
+from pathlib import Path
 
 from surfclip.analysis.pose import (
     Keypoints,
@@ -26,7 +27,6 @@ from surfclip.store.schemas import (
     RideAnalysis,
     Riders,
     Rides,
-    RideSummary,
     SourceInfo,
 )
 from surfclip.store.session import SessionStore
@@ -91,12 +91,21 @@ def analyse_session(
 ) -> AnalysisFile:
     from surfclip.stages import session_observations
 
-    rides = store.read_model("rides.json", Rides)
-    riders = store.read_model("riders.json", Riders) if store.path("riders.json").exists() else None
-    names = named_riders(riders)
-    if only_rider is not None:
-        names = {r: n for r, n in names.items() if n.lower() == only_rider.lower()}
-    todo = sorted((r for r in rides.rides if r.ride_id in names), key=lambda r: r.start_s)
+    if store.session.kind == "reference":  # an imported clip: its chosen surfer, one "ride"
+        from surfclip.analysis.reference import reference_ride
+
+        ref = reference_ride(store)
+        todo = [ref] if ref is not None else []
+        names = {r.ride_id: Path(store.session.source_path).stem for r in todo}
+    else:
+        rides = store.read_model("rides.json", Rides)
+        riders = (
+            store.read_model("riders.json", Riders) if store.path("riders.json").exists() else None
+        )
+        names = named_riders(riders)
+        if only_rider is not None:
+            names = {r: n for r, n in names.items() if n.lower() == only_rider.lower()}
+        todo = sorted((r for r in rides.rides if r.ride_id in names), key=lambda r: r.start_s)
     old = read_analysis(store)
     previous = {a.ride_id: a for a in old.rides} if old else {}
     info = store.read_model("probe.json", SourceInfo)
@@ -160,10 +169,6 @@ def analyse_session(
     return result
 
 
-def empty_summary(ride: Ride) -> RideSummary:
-    return RideSummary(length_s=round(ride.length_s, 3))
-
-
 def with_user_edits(store: SessionStore, result: AnalysisFile) -> AnalysisFile:
     """Stars and trick tags from edits.json applied to the stage output (they are edits, so
     they follow rides by span like every user correction; the latest star edit wins)."""
@@ -171,6 +176,8 @@ def with_user_edits(store: SessionStore, result: AnalysisFile) -> AnalysisFile:
     from surfclip.edits.log import read_edits
     from surfclip.store.schemas import AnalysisEvent
 
+    if not store.path("rides.json").exists():  # reference clips have no rides or edits
+        return result
     rides = {r.ride_id: r for r in store.read_model("rides.json", Rides).rides}
     edits = read_edits(store)
     undone = undone_ids(edits)
