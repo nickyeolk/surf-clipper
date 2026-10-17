@@ -111,6 +111,7 @@ class SessionSummary(BaseModel):
     zone_confirmed: bool
     zone_checked: bool  # confirmed by the user, not only the automatic proposal
     job: Job | None  # running analysis or re-run
+    analysis_job: Job | None = None  # 004 ride analysis running for this session
 
 
 RideOp = Literal["trim", "split", "merge", "delete", "add", "undo"]
@@ -333,6 +334,7 @@ def create_app(
                     zone_confirmed=(zone := confirmed_zone(read_edits(SessionStore(root, s))))
                     is not None,
                     zone_checked=zone is not None and zone.origin == "user",
+                    analysis_job=work_jobs.active(s.session_id, "analysis"),
                     job=work_jobs.active(s.session_id, "analyse")
                     or work_jobs.active(s.session_id, "rerun"),
                 )

@@ -115,7 +115,7 @@
   $effect(() => {
     void load()
     const timer = setInterval(() => {
-      if (sessions?.some((s) => s.job) || references.some((r) => r.status === 'working')) void load()
+      if (sessions?.some((s) => s.job || s.analysis_job) || references.some((r) => r.status === 'working')) void load()
     }, 2000)
     return () => clearInterval(timer)
   })
@@ -249,8 +249,9 @@
                   <a class="button" href={`#/riders/${s.session_id}`}>Riders</a>
                   <a class="button secondary" href={`#/viewer/${s.session_id}`}
                     title="Watch exported clips and compilations at full quality; saved stills">Exports</a>
-                  {#if analyseJobs[s.session_id] && ['queued', 'running'].includes(analyseJobs[s.session_id].status)}
-                    <span class="small">analysing <progress max="1" value={analyseJobs[s.session_id].progress}></progress></span>
+                  {@const aj = s.analysis_job ?? analyseJobs[s.session_id]}
+                  {#if aj && ['queued', 'running'].includes(aj.status)}
+                    <span class="small" title={aj.message}>analysing <progress max="1" value={aj.progress}></progress> {Math.round(aj.progress * 100)}%</span>
                   {:else}
                     <span class="picker">
                       <button class="secondary" onclick={() => openPicker(s.session_id)}

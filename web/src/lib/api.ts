@@ -17,6 +17,7 @@ export interface SessionSummary {
   zone_confirmed: boolean
   zone_checked: boolean
   job: Job | null
+  analysis_job: Job | null
 }
 
 export interface SourceVideo {
