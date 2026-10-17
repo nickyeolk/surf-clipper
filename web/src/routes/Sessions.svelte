@@ -46,7 +46,10 @@
   let refChosen = $state('')
   // which named riders to analyse: a small menu per session
   interface NamePick {
-    name: string
+    label: string // "me", or "Rider 3" for an unnamed card
+    name: string | null // the user's name for the card, if any
+    newName: string // typed here to name an unnamed card and include it
+    firstRide: string // to find the card again (card ids change when riders are renamed)
     rides: number
     analysed: number
     checked: boolean
@@ -65,20 +68,40 @@
     try {
       const info = await api.riders(sid)
       const done = await api.analysis(sid).then((a) => a.rides).catch(() => [])
-      const named = info.riders.filter((g) => g.name && !g.ignored)
+      const cards = info.riders.filter((g) => !g.ignored && g.ride_ids.length)
       const analysed = new Set(done.map((r) => r.rider.toLowerCase()))
-      const me = named.find((g) => g.name!.toLowerCase() === 'me')
-      picks = named.map((g) => ({
-        name: g.name!,
-        rides: g.ride_ids.length,
-        analysed: done.filter((r) => r.rider.toLowerCase() === g.name!.toLowerCase()).length,
-        // default: whoever was analysed before, else "me", else everyone named
-        checked: analysed.size ? analysed.has(g.name!.toLowerCase()) : me ? g === me : true,
-      }))
-      pickNote = picks.length ? '' : 'Nobody is named in this session yet: name riders in Riders first.'
+      const me = cards.find((g) => g.name?.toLowerCase() === 'me')
+      picks = cards
+        .map((g) => ({
+          label: g.name ?? g.label ?? g.rider_id,
+          name: g.name ?? null,
+          newName: '',
+          firstRide: g.ride_ids[0],
+          rides: g.ride_ids.length,
+          analysed: g.name ? done.filter((r) => r.rider.toLowerCase() === g.name!.toLowerCase()).length : 0,
+          // default: whoever was analysed before, else "me", else everyone named
+          checked: !!g.name && (analysed.size ? analysed.has(g.name.toLowerCase()) : me ? g === me : true),
+        }))
+        .sort((p, q) => Number(!!q.name) - Number(!!p.name))
+      pickNote = picks.length ? '' : 'No riders found in this session yet.'
     } catch {
       pickNote = 'No riders yet for this session.'
     }
+  }
+  async function analyseChosen(sid: string) {
+    const chosen = picks.filter((p) => p.checked && (p.name || p.newName.trim()))
+    try {
+      // name the cards named here first (analysis is for named riders only)
+      for (const p of chosen.filter((p) => !p.name)) {
+        const info = await api.riders(sid)
+        const card = info.riders.find((g) => g.ride_ids.includes(p.firstRide))
+        if (card) await api.riderEdit(sid, { op: 'rider_name', rider_id: card.rider_id, name: p.newName.trim() })
+      }
+    } catch (e) {
+      addError = `could not name the rider: ${(e as Error).message}`
+      return
+    }
+    await analyse(sid, chosen.map((p) => p.name ?? p.newName.trim()))
   }
   async function analyse(sid: string, riders?: string[]) {
     pickFor = null
@@ -259,16 +282,24 @@
                       {#if pickFor === s.session_id}
                         <div class="menu">
                           {#if pickNote}<p class="small">{pickNote}</p>{/if}
-                          {#each picks as p (p.name)}
-                            <label class="small">
-                              <input type="checkbox" bind:checked={p.checked} />
-                              {p.name} <span class="muted">{p.rides} rides{p.analysed ? `, ${p.analysed} analysed` : ''}</span>
+                          {#each picks as p (p.firstRide)}
+                            <label class="small pick">
+                              <input type="checkbox" bind:checked={p.checked} disabled={!p.name && !p.newName.trim()} />
+                              {#if p.name}
+                                <strong>{p.name}</strong>
+                              {:else}
+                                <span class="muted">{p.label}</span>
+                                <input class="name" placeholder="name to include" bind:value={p.newName}
+                                  oninput={() => (p.checked = !!p.newName.trim())} />
+                              {/if}
+                              <span class="muted">{p.rides} rides</span>
+                              {#if p.analysed}<span class="tag ok" title="Already analysed; tick to redo or update">✓ {p.analysed} analysed</span>{/if}
                             </label>
                           {/each}
                           {#if picks.length}
                             <div class="row small">
                               <button class="primary" disabled={!picks.some((p) => p.checked)}
-                                onclick={() => analyse(s.session_id, picks.filter((p) => p.checked).map((p) => p.name))}>
+                                onclick={() => analyseChosen(s.session_id)}>
                                 Analyse {picks.filter((p) => p.checked).reduce((n, p) => n + p.rides, 0)} rides
                               </button>
                               <button onclick={() => (pickFor = null)}>cancel</button>
@@ -281,11 +312,23 @@
                   {/if}
                   {#if analyseJobs[s.session_id]?.status === 'failed'}<span class="error small">{analyseJobs[s.session_id].error}</span>{/if}
                   <a class="button secondary" href={`#/best/${s.session_id}`} title="Your rides by score; star the ones you love">Best</a>
-                  <a class="button secondary" href={`#/label/${s.session_id}`}>Label</a>
-                  {#if s.labels_final}
-                    <a class="button secondary" href={`#/rider-labels/${s.session_id}`}
-                      title="Say who rode each labelled ride (for measuring rider grouping)">Label riders</a>
+                  {#if Object.keys(s.analysed_riders ?? {}).length}
+                    <span class="small muted" title="Riders whose rides are analysed (body positions for Compare and Best)">
+                      analysed: {Object.entries(s.analysed_riders).map(([n, k]) => `${n} (${k})`).join(', ')}
+                    </span>
                   {/if}
+                  <details class="testing">
+                    <summary class="small muted" title="Screens for measuring how well the automatic steps work">testing ▾</summary>
+                    <div class="menu small">
+                      <p class="muted">Test data for checking the tool's accuracy. They start from the computer's
+                        own results, not your edits, so they can look different from Review and Riders.</p>
+                      <a class="button secondary" href={`#/label/${s.session_id}`}>Label rides</a>
+                      {#if s.labels_final}
+                        <a class="button secondary" href={`#/rider-labels/${s.session_id}`}
+                          title="Say who rode each labelled ride (for measuring rider grouping)">Label riders</a>
+                      {/if}
+                    </div>
+                  </details>
                 {:else}
                   <span class="muted small">not analysed</span>
                 {/if}
@@ -343,7 +386,8 @@
     position: absolute;
     z-index: 10;
     top: 100%;
-    left: 0;
+    right: 0;
+    line-height: 1.5;
     min-width: 240px;
     background: var(--panel);
     border: 1px solid var(--border);
@@ -355,6 +399,23 @@
   .menu label {
     display: block;
     padding: 2px 0;
+  }
+  .menu .name {
+    width: 9em;
+    padding: 1px 4px;
+  }
+  .testing {
+    position: relative;
+    display: inline-block;
+  }
+  .testing summary {
+    cursor: pointer;
+    list-style: none;
+  }
+  .testing .menu {
+    min-width: 280px;
+    right: 0;
+    left: auto;
   }
   .menu .row {
     display: flex;
@@ -412,6 +473,7 @@
     width: 4em;
   }
   .actions {
-    white-space: nowrap;
+    white-space: normal;
+    line-height: 2.2;
   }
 </style>

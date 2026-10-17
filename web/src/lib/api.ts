@@ -18,6 +18,7 @@ export interface SessionSummary {
   zone_checked: boolean
   job: Job | null
   analysis_job: Job | null
+  analysed_riders: Record<string, number>
 }
 
 export interface SourceVideo {
