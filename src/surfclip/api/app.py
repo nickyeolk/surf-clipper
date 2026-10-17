@@ -19,7 +19,7 @@ from urllib.parse import quote
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from surfclip.analysis.pose import read_keypoints
 from surfclip.analysis.reference import choose_surfer, people_at, read_reference
@@ -112,7 +112,6 @@ class SessionSummary(BaseModel):
     zone_checked: bool  # confirmed by the user, not only the automatic proposal
     job: Job | None  # running analysis or re-run
     analysis_job: Job | None = None  # 004 ride analysis running for this session
-    analysed_riders: dict[str, int] = Field(default_factory=dict[str, int])  # name -> rides
 
 
 RideOp = Literal["trim", "split", "merge", "delete", "add", "undo"]
@@ -288,22 +287,6 @@ def create_app(
         tmp.write_text(work.model_dump_json(indent=2), encoding="utf-8")
         tmp.replace(work_file)
 
-    analysed_cache: dict[Path, tuple[int, dict[str, int]]] = {}
-
-    def analysed_riders(root: Path) -> dict[str, int]:
-        """Rides analysed per rider name (cached by the analysis file's mtime: it is large)."""
-        path = root / "analysis.json"
-        if not path.exists():
-            return {}
-        mtime = path.stat().st_mtime_ns
-        hit = analysed_cache.get(path)
-        if hit is None or hit[0] != mtime:
-            counts: dict[str, int] = {}
-            for a in AnalysisFile.model_validate_json(path.read_text(encoding="utf-8")).rides:
-                counts[a.rider] = counts.get(a.rider, 0) + 1
-            hit = analysed_cache[path] = (mtime, counts)
-        return hit[1]
-
     @app.get("/api/sessions")
     def list_sessions() -> list[SessionSummary]:
         out: list[SessionSummary] = []
@@ -352,7 +335,6 @@ def create_app(
                     is not None,
                     zone_checked=zone is not None and zone.origin == "user",
                     analysis_job=work_jobs.active(s.session_id, "analysis"),
-                    analysed_riders=analysed_riders(root),
                     job=work_jobs.active(s.session_id, "analyse")
                     or work_jobs.active(s.session_id, "rerun"),
                 )

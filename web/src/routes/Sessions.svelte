@@ -312,11 +312,6 @@
                   {/if}
                   {#if analyseJobs[s.session_id]?.status === 'failed'}<span class="error small">{analyseJobs[s.session_id].error}</span>{/if}
                   <a class="button secondary" href={`#/best/${s.session_id}`} title="Your rides by score; star the ones you love">Best</a>
-                  {#if Object.keys(s.analysed_riders ?? {}).length}
-                    <span class="small muted" title="Riders whose rides are analysed (body positions for Compare and Best)">
-                      analysed: {Object.entries(s.analysed_riders).map(([n, k]) => `${n} (${k})`).join(', ')}
-                    </span>
-                  {/if}
                   <details class="testing">
                     <summary class="small muted" title="Screens for measuring how well the automatic steps work">testing ▾</summary>
                     <div class="menu small">
