@@ -1,6 +1,7 @@
 """Turns, pumps, trimming and the ride's ending (004 research R4, R5).
 
-First version, rules only (constitution VIII); thresholds are tuned on the user's marks (T012).
+First version, rules only (constitution VIII). Turns are a helper (snapping comparison sync points,
+score features), not a reported metric.
 
 * A **turn** is a compression minimum below ``pump_depth`` with a change of direction within
   ``turn_window_s``: the lateral pool velocity changes sign at speed, or the rider's body

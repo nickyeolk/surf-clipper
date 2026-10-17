@@ -236,25 +236,6 @@ export interface RiderEditRequest {
 }
 
 // ---- 003: health, exports viewer, stills ----------------------------------------------------
-// ---- 004: ride analysis ----------------------------------------------------------------------
-export type Ending = 'fall' | 'exit' | 'unclear'
-
-export interface MarkedRide {
-  start_s: number
-  end_s: number
-  ride_id: string | null
-  turns: number[]
-  pumps: number[]
-  ending: Ending | null
-}
-
-export interface AnalysisMarks {
-  schema_version?: string
-  source: string
-  rides: MarkedRide[]
-  final: boolean
-}
-
 export interface DeletedRide {
   edit_id: number
   ride_id: string
@@ -401,11 +382,6 @@ export const api = {
   job: (jobId: string) => call<Job>(`/jobs/${jobId}`),
   thumbUrl: (id: string, t: number) => `/api/sessions/${id}/media/thumb.jpg?t=${(Math.round(t * 2) / 2).toFixed(1)}`,
   clipUrl: (id: string, rideId: string) => `/api/sessions/${id}/media/clips/${rideId}.mp4`,
-  marks: (id: string) => call<AnalysisMarks>(`/sessions/${id}/marks`),
-  saveMarks: (id: string, marks: AnalysisMarks) =>
-    call<AnalysisMarks>(`/sessions/${id}/marks`, { method: 'PUT', body: JSON.stringify(marks) }),
-  finalizeMarks: (id: string) =>
-    call<{ rides: number; turns: number; falls: number }>(`/sessions/${id}/marks/finalize`, { method: 'POST' }),
   deleted: (id: string) => call<DeletedRide[]>(`/sessions/${id}/deleted`),
   restore: (id: string, editIds: number[] | null) =>
     call<{ restored: number[]; rides: Rides }>(`/sessions/${id}/restore`, {

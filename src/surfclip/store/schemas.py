@@ -257,10 +257,8 @@ EditOp = Literal[
     "rider_ignore",
     "ride_rider",
     "rider_unjoin",
-    # 004: analysis corrections and trick tags, anchored to rides by span
-    "ride_ending",
-    "turn_add",
-    "turn_remove",
+    # 004: stars and trick tags, anchored to rides by span
+    "ride_star",
     "trick_tag",
 ]
 

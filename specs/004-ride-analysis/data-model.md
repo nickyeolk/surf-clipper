@@ -1,63 +1,50 @@
-# Data Model: Ride Analysis
+# Data Model: Ride Analysis (rescoped 2026-10-17)
 
 ## Keypoints (`analysis/<ride_id>.parquet`, one row per analysed frame)
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| t | float | source seconds |
-| box | 4×float | crop box in source pixels |
-| kp | 17×3 float | COCO keypoints (x, y in source pixels; confidence) |
-| other_iou | float | max IoU of the crop with another tracked person |
+`t` (source s), `box` (crop box, source px), `kp` (17 × x, y, confidence; source px),
+`other_iou` (overlap with another tracked person).
 
 ## RideAnalysis (in `analysis.json`)
 
-| Field | Type | Notes |
-| --- | --- | --- |
-| ride_id | str | |
-| span | (float, float) | ride start/end it was computed for |
-| rider | str | user-given name at analysis time |
-| cache_key | str | span + rider + `[analysis_pose]` + code version |
-| fps | float | analysis rate |
-| compression | list[float \| null] | per frame, 1.0 = ride median; null = unclear |
-| lateral | list[float \| null] | pool `u` per frame where available |
-| turns | list[Event] | `t`, `depth` (compression at the minimum), `side` (frontside/backside if known) |
-| pumps | list[Event] | |
-| shares | {turning, pumping, trimming, unclear} | fractions of ride time |
-| ending | "fall" \| "exit" \| "unclear" | after corrections |
-| ending_auto | same | before corrections |
-| summary | {length_s, turns, pumps, turn_rate_per_10s, rhythm_cv, mean_depth} | |
+| Field | Notes |
+| --- | --- |
+| ride_id, span, rider, cache_key, keypoints_key, fps, t0 | identity and cache |
+| compression, lean, arms, stance | per-frame series, null where unclear (FR-002) |
+| lateral | pool `u` where the session has a zone |
+| turns, pumps | events: `t`, `depth` |
+| shares, ending, summary | as built |
+| score | `{value, parts: {feature: contribution}, explanation}` (filled on read) |
+| starred | bool (from edits, on read) |
+| tricks | user tags: `t`, `name` (from edits, on read) |
 
-`rhythm_cv`: coefficient of variation of intervals between consecutive turns/pumps (lower =
-steadier rhythm, a "flow" proxy).
+Measures: **compression** = hip-ankle / shoulder-hip (or leg straightness); **lean** = angle of
+the hip→shoulder line from the image vertical, signed (camera-relative); **arms** = wrist-wrist
+distance / torso length; **stance** = ankle-ankle distance / torso length.
 
-## AnalysisFile (`analysis.json`)
+## Reference clip
 
-`schema_version`, `session_id`, `rides: list[RideAnalysis]`, `settings`.
+A session (`session.json`, `kind = "reference"`) plus `reference.json`:
+`{track_id, start_s, end_s, picked_at: {t, x, y}}`. Its single ride `ref` spans the chosen
+track; analysis as for rides; `rider` = the clip's file stem.
 
-## Edits (new ops in `edits.json`)
+## Edits (`edits.json`)
 
 | op | target | payload |
 | --- | --- | --- |
-| `ride_ending` | ride_id | `ending`, `spans` |
-| `turn_add` | ride_id | `t`, `spans` |
-| `turn_remove` | ride_id | `t` (nearest turn within 0.5 s), `spans` |
+| `ride_star` | ride_id | `starred: bool`, `spans` |
 | `trick_tag` | ride_id | `t`, `name`, `spans` |
 
-Tags are deleted with the existing `undo`.
+## Score weights (`artifacts/score.json`)
 
-## Marks (`labels/analysis/<video>.json`)
+`{features: [..], mean: [..], std: [..], weights: [..], bias, fitted_on: {stars, rides,
+sessions}, fitted_at}`; defaults from `[score]` when there are too few stars.
 
-`source`, `rides: [{start_s, end_s, turns: [t], ending, pumps?: [t]}]`, `final: bool`.
+Features: `length_s`, `clean_end` (1 exit, 0 fall, 0.5 unclear), `compressions_per_10s`,
+`depth` (1 - mean compression at events), `rhythm` (1 - rhythm_cv, clipped), `tricks`,
+`unclear` (negative weight).
 
-## Trend point
+## Config
 
-`session_id`, `video`, `date`, `rides`, `shares`, `turn_rate_per_10s`, `rhythm_cv`,
-`falls`, `exits`, `mean_depth`.
-
-## Config `[analysis_pose]`
-
-`fps = 15`, `model = "artifacts/models/yolo11s-pose.pt"`, `imgsz = 384`, `crop_margin = 0.3`,
-`min_conf = 0.3`, `smooth_s = 0.3`, `signal = "leg_torso" | "leg_straightness"` (R3),
-`turn_speed_pool_per_s`,
-`turn_window_s = 0.7`, `pump_depth = 0.85`, `fall_window_s = 1.5`,
-`fall_depth = 0.6`, `compare_window_s = [3.0, 0.5]`, `other_iou_max = 0.3`.
+`[analysis_pose]` as built. `[score]`: default weights per feature, `min_stars = 5`,
+`l2 = 1.0`.

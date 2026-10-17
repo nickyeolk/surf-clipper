@@ -64,24 +64,30 @@ marked rides, held-out session excluded. Record in "R3 results".
   (board leaves the feet while the body stays upright).
 - **Unclear**: otherwise. The user can correct (edit `ride_ending`).
 
-## R6. Fall comparison
+## R6. Comparison playback (rescope 2026-10-17)
 
-For each fall, the window [end - 3 s, end - 0.5 s]; for each clean exit, the same window
-before the exit. Measures: mean and minimum compression, time since last turn, turn rate,
-lateral position on the wave (pool `u`, where available), depth on the face (pool `v`). Shown
-as two columns with the per-ride values as dots, plus a playlist of the windows (fall moments
-back to back in the review copy).
+Each side is the session's 720p review copy in a container; a CSS transform (scale + translate)
+keeps the surfer's crop box (from the keypoints file, smoothed over ~0.5 s so the view doesn't
+jitter) filling the panel. The skeleton is drawn on a canvas in the same transformed space, with
+keypoints linearly interpolated between the 15 fps analysis frames. Mirror = `scaleX(-1)` on the
+container (keypoints mirrored with it). Sync: B's time = B.sync + (A.time - A.sync); A drives the
+clock; on each animation frame B is re-seeked if it drifts by more than half a frame (paused) or
+its playbackRate is nudged ±3% (playing). Measures under the videos share an x axis of "seconds
+from sync".
 
-## R7. Trends
+## R7. Reference clips
 
-`GET /api/trends?name=me` scans every session's `analysis.json` and riders, takes rides whose
-rider's user-given name equals the query (case-insensitive) and returns one point per session
-(date from the session's creation or the file's recording time) per measure. No appearance data
-is read; only names the user typed.
+An imported clip is a session (`kind = "reference"`) so it reuses probe, review copy, detection
+and tracking; zone, rides and riders are skipped. The user clicks the surfer on a frame; the
+track whose box contains the click (nearest centre otherwise) at that time is chosen, and nearby
+tracks that continue it (001's stitching rules) are joined. The clip's single ride spans the
+chosen track.
 
-## R8. Evaluation marks
+## R8. Score from stars
 
-`labels/analysis/<video>.json`: per ride (start/end in seconds, to re-attach): turn times,
-ending (fall/exit/unclear), and optional pump/trim spans. Marked in the Marks screen with keys
-(t = turn at playhead, f/e = fall/exit). `surfclip eval-analysis` reports SC-001..003 per
-session; PXL and 20241004 are the first two marked sessions, a third is held out.
+Features per analysed ride (data-model.md), standardised over all the user's analysed rides.
+Default weights from `[score]` (length 1, clean end 1, compressions 0.5, depth 1, rhythm 0.5,
+tricks 0.5, unclear -1). With ≥ 5 starred and ≥ 5 unstarred rides, weights are fitted by
+L2-regularised logistic regression (starred = 1), pooled over sessions; the explanation names the
+two or three largest positive and negative contributions in words ("long ride, deep turns; fell
+at the end"). SC-002 is measured leaving one session out of the fit.

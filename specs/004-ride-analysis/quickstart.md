@@ -1,12 +1,12 @@
 # Quickstart: Ride Analysis
 
-1. In Riders, name yourself ("me") in the session.
-2. Sessions → **Analysis**: press **Analyse** (about 20 s per ride of yours).
-3. Review: open one of your rides; toggle **skeleton**; the strip under the player shows the
-   compression curve with turns (▼), pumps (·) and the ending. Press `t` to tag a trick.
-4. Analysis screen: ride table, turning/pumping/trimming shares, **Before falls** comparison
-   and **play falls**; **Tricks** lists your tags.
-5. **Trends** (from Analysis): your sessions as points per measure.
-
-Evaluation (before tuning): Sessions → **Mark rides**: play each of your rides, press `t` at
-each turn, `f` or `e` at the end (fall/exit); finalize. Then `surfclip eval-analysis VIDEO`.
+1. In Riders, name yourself ("me") and anyone whose style you want to compare with.
+2. Sessions → **Analyse rides** (about 6-20 s per ride).
+3. **Compare**: pick your ride and a reference (a named rider's ride, an imported clip or a trick
+   tag). Set a sync point in each (or snap to the nearest turn), play at 0.25x, step frames,
+   mirror if one surfer rides the other way; read the four curves under the videos.
+4. **Reference clips**: Sessions → References → Import a clip from the footage folder; click the
+   surfer on a frame; it is analysed and appears in Compare.
+5. **Best rides**: Sessions → Best; star rides you love; rides sort by score with a one-line
+   reason; select the top ones → compilation.
+6. **Tricks**: in Review press `g` to tag a trick at the playhead; Tricks lists them by name.

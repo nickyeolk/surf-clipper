@@ -21,8 +21,6 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from surfclip.analysis.marks import AnalysisMarks, MarksError, marks_path, marks_work
-from surfclip.analysis.marks import finalize as finalize_analysis_marks
 from surfclip.api.jobs import Job, Jobs, Report
 from surfclip.config import DEFAULT_CONFIG_PATH, load_config
 from surfclip.edits.apply import RIDER_OPS, undone_ids
@@ -473,55 +471,6 @@ def create_app(
         work.finalized = True
         work_file.write_text(work.model_dump_json(indent=2), encoding="utf-8")
         return {"rides": len(labels.rides), "riders": len({r.rider for r in labels.rides})}
-
-    # ---- 004: evaluation marks for ride analysis (times only; never change rides) ------------
-    marks_dir = labels_dir.parent / "analysis"
-
-    def load_marks(sid: str) -> AnalysisMarks:
-        session = session_of(sid)
-        path = marks_path(marks_dir, session.source_path)
-        existing = (
-            AnalysisMarks.model_validate_json(path.read_text(encoding="utf-8"))
-            if path.exists()
-            else None
-        )
-        rides: Rides = read(folder(sid) / "rides.json", Rides)
-        riders: Riders | None = (
-            read(folder(sid) / RIDERS_FILE, Riders)
-            if (folder(sid) / RIDERS_FILE).exists()
-            else None
-        )
-        return marks_work(existing, rides, riders, Path(session.source_path).name)
-
-    def save_marks(sid: str, marks: AnalysisMarks) -> None:
-        path = marks_path(marks_dir, session_of(sid).source_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(marks.model_dump_json(indent=2), encoding="utf-8")
-        tmp.replace(path)
-
-    @app.get("/api/sessions/{sid}/marks")
-    def get_marks(sid: str) -> AnalysisMarks:
-        return load_marks(sid)
-
-    @app.put("/api/sessions/{sid}/marks")
-    def put_marks(sid: str, marks: AnalysisMarks) -> AnalysisMarks:
-        marks = marks.model_copy(update={"final": False})
-        save_marks(sid, marks)
-        return marks
-
-    @app.post("/api/sessions/{sid}/marks/finalize")
-    def finalize_marks(sid: str) -> dict[str, int]:
-        try:
-            marks = finalize_analysis_marks(load_marks(sid))
-        except MarksError as exc:
-            raise ApiError(409, "marks_incomplete", str(exc)) from exc
-        save_marks(sid, marks)
-        return {
-            "rides": len(marks.rides),
-            "turns": sum(len(m.turns) for m in marks.rides),
-            "falls": sum(m.ending == "fall" for m in marks.rides),
-        }
 
     @app.get("/api/sessions/{sid}/media/rider-still.jpg")
     def get_rider_still(sid: str, ride: str, t: float | None = None) -> Response:

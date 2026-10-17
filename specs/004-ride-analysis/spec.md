@@ -4,195 +4,205 @@
 
 **Created**: 2026-10-17
 
-**Status**: Draft
+**Status**: Draft (rescoped 2026-10-17)
 
 **Input**: User description: "Analyse my rides so I can improve my surfing, in flow (aesthetics)
-and tricks. Useful questions: what am I doing differently on rides where I fall, and how much of
-each ride am I actually turning or pumping." Builds on 001 (rides, tracks, wave zone), 002
-(riders, names) and 003 (viewer, compilations).
+and tricks." Rescoped after discussion: "If I see someone with great style, I can place it side
+by side and try to understand how I can position my body better to do tricks or to match the
+style" and "some indicator of how fancy a ride was so I can clip it." Builds on 001 (rides,
+tracks), 002 (riders, names) and 003 (viewer, compilations).
 
 ## Context
 
 A spike on the user's footage (2026-10-17, `scripts/spikes/ride_pose.py`) found 2D pose usable:
 shoulders, hips, knees and ankles are found in 99-100% of frames for riders 85-360 px tall,
-both on the handheld 1080p session and the fixed 720p camera. A compress/extend signal follows
-the rider's bottom turns and trims, and falls are obvious. Two limits shape this feature:
-absolute joint angles from one camera are unreliable (viewpoint, wave-face slope, legs swapping
-in a deep crouch), and a rider's size in the image changes 3x within a ride with distance from
-the camera, so every measure must be relative to the rider's own body, not to pixels.
+handheld 1080p and fixed 720p alike. A compress/extend signal follows bottom turns and trims;
+falls are obvious. Limits: absolute joint angles from one camera are unreliable, and a rider's
+size in the image changes 3x within a ride, so measures are ratios of the rider's own body.
+
+Counting turns per ride describes a ride but does not tell the rider how to ride better, so the
+feature is built around two things the user will act on: **comparing their body position with a
+surfer whose style they like**, and **finding their best rides**. Turn and compression signals are
+ingredients of both, not reports of their own.
 
 ## Clarifications
 
 ### Session 2026-10-17
 
-- Q: Tricks in the first version? → A: The user tags trick moments; they are listed and become
-  examples for a later detector. No automatic trick recognition yet.
-- Q: Compare across sessions? → A: Yes, pooled by the name the user gives in each session
-  (e.g. "me"), never by matching appearance across sessions.
-- Q: Which riders are analysed? → A: Named riders only.
+- Q: Tricks in the first version? → A: The user tags trick moments; tags make attempts easy to
+  find and compare. No automatic trick recognition yet.
+- Q: Which riders are analysed? → A: Named riders only (in sessions), plus imported clips.
+- Q: Comparison or best-rides score first? → A: Both, in this feature.
+- Q: Where does the reference surfer's footage come from? → A: Both: a rider the user names in
+  their own sessions, and video clips the user imports.
+- Q: Fall comparison and session trends? → A: Dropped for now.
+- Q: Evaluation labels? → A: The user stars their favourite rides (seconds per ride) instead of
+  marking turns; the best-rides score is tuned to rank starred rides first.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - See how I move on each ride (Priority: P1)
+### User Story 1 - Side by side with a stylish surfer (Priority: P1)
 
-The user plays one of their rides and sees their skeleton drawn over it (toggle) and, under the
-player, a timeline of how compressed or extended they are, with turns and pumps marked. A short
-summary says how long the ride was, how many turns and pumps, how regular the rhythm was and how
-the ride ended.
+The user picks one of their rides (or a tagged trick attempt) and a reference: a ride of a
+surfer they named in one of their sessions, or an imported clip. The two play side by side,
+each cropped to the surfer, with skeletons drawn on. The user sets a sync point in each (e.g. the
+bottom of the same turn, the take-off of a trick) and both play from there together, at 1x or
+slowed down, frame-steppable. Under the videos, a few body measures for both, on one time axis:
+how low (compression), torso lean, arm spread, stance width.
 
-**Why this priority**: it is what everything else builds on, and seeing the rhythm next to the
-video is useful on its own for "flow".
+**Why this priority**: the most direct help for body positioning, style and tricks.
 
-**Independent Test**: analyse a named rider's rides in one session; on 5 rides the user has
-marked turns and endings, the marked turns and endings match within the success criteria.
+**Independent Test**: compare a ride of the user with a reference ride; set sync points; both
+play in step with skeletons and both measure curves aligned at the sync point.
 
 **Acceptance Scenarios**:
 
-1. **Given** a session with a named rider, **When** analysis has run, **Then** each of that
-   rider's rides has a compression timeline, turns and pumps marked, and a summary.
-2. **Given** a ride in the player, **When** the user turns the skeleton on, **Then** the
-   skeleton follows the rider at full frame rate without visible lag.
-3. **Given** a ride that ends in a fall, **When** analysed, **Then** its ending is "fall";
-   a ride ending by stepping or kicking off is "exit".
+1. **Given** an analysed ride of the user and an analysed reference, **When** the user opens the
+   comparison and sets a sync point in each, **Then** both play together from the sync points,
+   at the same speed, and frame steps move both by one frame.
+2. **Given** the comparison, **When** it plays, **Then** each surfer's skeleton follows them and
+   the measure curves of both are drawn on one time axis aligned at the sync point.
+3. **Given** a sync point at a turn in one ride, **When** the user asks to align on the nearest
+   turn in the other, **Then** the other's sync point snaps to its nearest detected turn.
 
 ---
 
-### User Story 2 - What do I do differently before I fall? (Priority: P2)
+### User Story 2 - Bring in a reference clip (Priority: P1)
 
-For a named rider, the tool compares the seconds before each fall with the same stretch of rides
-that ended cleanly: compression depth, rhythm, time since the last turn, position on the wave,
-and shows the falls side by side so the user can watch them in a row.
+The user imports a video of a surfer whose style they like (from the footage folder: a pro clip
+they downloaded, a friend's phone video). The tool finds the surfer, runs the same analysis and
+offers it as a reference. If several people are in it, the user picks which one.
 
-**Why this priority**: the user's own question; turns a pile of rides into a lesson.
+**Why this priority**: the best reference is often not in the user's own sessions.
 
-**Independent Test**: on a session with at least 3 falls and 3 clean exits, the comparison lists
-every fall and every clean ride correctly and plays the pre-fall moments back to back.
+**Independent Test**: import a 30-60 s clip of one surfer; it appears as a reference with
+skeletons; import one with two people and pick the second.
 
 **Acceptance Scenarios**:
 
-1. **Given** a session with falls and clean exits, **When** the user opens the comparison,
-   **Then** they see each measure for "before falls" vs "before clean exits", and can play all
-   pre-fall moments in a row.
+1. **Given** a clip in the footage folder, **When** the user imports it as a reference, **Then**
+   within a few minutes it is analysed and listed as a reference with its surfer.
+2. **Given** a clip with several people, **When** imported, **Then** the user picks the surfer by
+   clicking them, and the analysis follows that person.
 
 ---
 
-### User Story 3 - Turning, pumping or just standing? (Priority: P2)
+### User Story 3 - Find my best rides (Priority: P2)
 
-Per ride and per session, the share of riding time spent turning, pumping and trimming
-(standing without much movement), and how that changes across sessions for the same name.
+Each of the user's rides gets a score of how good it was (style, flow, commitment), and the
+user's rides can be sorted by it, with the top rides one click from a compilation. The user stars
+rides they love; the score learns from the stars which rides they consider best.
 
-**Why this priority**: the user's second question; the session trend is how they see improvement.
+**Why this priority**: finding rides worth clipping and seeing which attempts were good.
 
-**Independent Test**: the shares on the user's marked rides match the marked time within the
-success criteria; a second session with the same name shows up in the trend.
+**Independent Test**: on sessions where the user starred rides, starred rides rank near the top.
 
 **Acceptance Scenarios**:
 
-1. **Given** analysed rides, **When** the user opens a session report, **Then** it shows the
-   turning/pumping/trimming shares per ride and for the session.
-2. **Given** two sessions where the user named themselves "me", **When** they open the trend,
-   **Then** each session is one point per measure, in date order.
+1. **Given** analysed rides, **When** the user sorts by score, **Then** the rides are listed best
+   first, with the score and what it was made of (e.g. "long, deep turns, steady rhythm, no fall").
+2. **Given** starred rides, **When** the score is refreshed, **Then** starred rides rank higher
+   than they did before, without the user ordering every ride.
+3. **Given** the top rides, **When** the user picks "compilation of these", **Then** 003's
+   captioned compilation is made of exactly those rides.
 
 ---
 
 ### User Story 4 - Tag tricks (Priority: P3)
 
-While watching, the user marks a moment as a trick with a name they choose (e.g. "floater",
-"360", "shove-it"). Tagged tricks are listed per session and across sessions by name and can be
-played back to back.
+While watching, the user marks a moment as a trick with a name they choose ("floater", "360").
+Tags are listed per session and across sessions, play back to back, and are one click from the
+comparison (e.g. "my 360 vs the reference 360").
 
-**Why this priority**: builds the examples a future trick detector needs; useful now as a library.
+**Why this priority**: makes practice attempts easy to find and compare.
 
-**Independent Test**: tag 3 tricks of 2 kinds; the list shows them by kind and plays each.
+**Independent Test**: tag 3 tricks of 2 kinds; list them by kind; open one in the comparison.
 
 **Acceptance Scenarios**:
 
 1. **Given** a ride in the player, **When** the user tags the current moment as "floater",
-   **Then** it appears in the trick list with its time and plays from a second before it.
-2. **Given** tags in two sessions under the same rider name, **When** the user filters by
-   "floater", **Then** both sessions' floaters are listed.
+   **Then** it appears in the trick list and plays from a second before it.
+2. **Given** a tag, **When** the user opens it in the comparison, **Then** its sync point is the
+   tagged moment.
 
 ---
 
 ### Edge Cases
 
-- The rider is partly hidden by spray or leaves the frame: those moments are marked as unclear
-  and not counted, rather than guessed.
-- Another person overlaps the rider (changeover, staff): the analysed skeleton stays on the
-  tracked rider.
-- Joined rides (002): analysed as one ride.
-- Very short rides (under the minimum length): not analysed.
-- A ride edited after analysis (trim, split): its analysis is refreshed for the new span only.
-- Portrait or handheld footage where the camera follows the rider: measures stay relative to
-  the rider's body, so zoom does not change them.
-- A renamed rider: their analysis and tags follow the rides, not the old name.
+- The surfer is hidden by spray or leaves the frame: those moments show no skeleton and gaps in
+  the curves rather than guesses.
+- Two people overlap (changeover, a crowded reference clip): the skeleton stays on the chosen
+  person; overlapping moments are marked unclear.
+- Reference and user filmed from different angles or distances: measures are body ratios, so
+  they compare; the view note says "as seen by each camera" for lean.
+- Mirror stance (regular vs goofy, or a left vs right turn): the comparison can mirror one video.
+- Different frame rates: both play in real time; frame steps follow each clip's own frames.
+- A ride edited after analysis: its analysis is refreshed for the new span only.
+- Imported clip in HDR or portrait: handled as sessions are.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: System MUST estimate the rider's body keypoints through each ride of named riders,
-  from the full-resolution source, at a configurable rate (default 15 per second).
-- **FR-002**: Measures MUST be relative to the rider's own body (proportions), never absolute
-  pixel sizes or absolute joint angles.
-- **FR-003**: System MUST derive a compression signal per ride and detect turns and pumps from it
-  and from the rider's movement across the wave.
-- **FR-004**: System MUST classify how each ride ended: fall, exit (stepped or kicked off), or
-  unclear.
-- **FR-005**: The player MUST be able to draw the skeleton over the ride and show the compression
-  timeline with turns, pumps and the ending marked.
-- **FR-006**: System MUST compare the seconds before falls with the same stretch before clean
-  exits for a rider in a session, and play the pre-fall moments back to back.
-- **FR-007**: System MUST report turning, pumping and trimming shares per ride and per session,
-  and a trend across sessions for riders with the same user-given name.
-- **FR-008**: Users MUST be able to tag a moment as a trick with a free-text name, list and play
-  tags per session and across sessions by name, and delete tags.
-- **FR-009**: Moments where the body is not seen well enough MUST be marked unclear and left out
-  of measures.
-- **FR-010**: Analysis MUST run only for named riders; nothing about other people is stored.
-- **FR-011**: Analysis MUST be cached per ride and recomputed only when the ride's span, the
-  rider or the settings change.
-- **FR-012**: Users MUST be able to correct an ending (fall/exit) and add or remove a turn mark;
-  corrections are kept like other edits and win over the automatic result.
-- **FR-013**: Thresholds (rates, signal smoothing, turn and pump detection, unclear limits) MUST
-  be configurable.
+- **FR-001**: System MUST estimate body keypoints through each ride of named riders and through
+  imported reference clips, from the full-resolution source (default 15 per second).
+- **FR-002**: Measures MUST be ratios of the surfer's own body (compression, arm spread, stance
+  width) or angles in the image labelled as camera-relative (lean); never absolute pixel sizes.
+- **FR-003**: Users MUST be able to play two analysed clips side by side, each cropped to its
+  surfer, with skeletons, a sync point per clip, shared play/pause/speed/frame-step, and an
+  optional mirror of either clip.
+- **FR-004**: The comparison MUST show the body measures of both clips on one time axis aligned
+  at the sync points.
+- **FR-005**: The comparison MUST offer snapping a sync point to the nearest detected turn or to a
+  trick tag.
+- **FR-006**: Users MUST be able to import a video from the footage folder as a reference clip,
+  pick the surfer when several people are visible, and have it analysed like a ride.
+- **FR-007**: System MUST compute a score per analysed ride from its measures (length, ending,
+  depth and number of compressions, rhythm regularity, tagged tricks) and explain it in words.
+- **FR-008**: Users MUST be able to star and unstar rides; the score's weights MUST be fitted to
+  the user's stars (across their sessions) and fall back to defaults with too few stars.
+- **FR-009**: Users MUST be able to sort their rides by score and make a 003 compilation of
+  chosen rides.
+- **FR-010**: Users MUST be able to tag a moment as a trick with a free-text name, list and play
+  tags per session and across sessions, delete tags, and open a tag in the comparison.
+- **FR-011**: Analysis MUST run only for named riders and imported references; nothing about
+  other people is stored.
+- **FR-012**: Analysis MUST be cached per ride (and per reference clip) and recomputed only when
+  the span, the surfer choice or the settings change.
+- **FR-013**: Thresholds and score defaults MUST be configurable.
 
 ### Key Entities
 
-- **Ride analysis**: per ride: keypoints over time, compression signal, turns, pumps, ending,
-  unclear spans, summary measures; settings it was made with.
-- **Trick tag**: session, ride, time, name; created by the user.
-- **Rider trend**: per user-given name, per session: the summary measures.
+- **Ride analysis**: per ride or reference clip: keypoints over time, measures, turns, ending,
+  score and its parts.
+- **Reference clip**: an imported video, the chosen surfer (track), its analysis.
+- **Star**: a ride the user loves (an edit, like other user corrections).
+- **Trick tag**: ride or clip, time, name.
+- **Comparison**: two clips and their sync points (may be saved to reopen).
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: On the user's marked rides (at least 10 rides over 2 sessions, one handheld and one
-  fixed camera), at least 80% of marked turns are detected within 0.5 s, with at most 20% of
-  detected turns unmarked.
-- **SC-002**: Ride endings are classified correctly for at least 90% of the marked rides.
-- **SC-003**: Turning/pumping/trimming shares per ride are within 15 percentage points of the
-  marked shares on average.
-- **SC-004**: Analysing a session's named-rider rides takes at most 10 minutes per hour of
-  footage containing about 30 rides of that rider.
-- **SC-005**: The skeleton overlay keeps up with playback at 1x on the laptop.
-- **SC-006**: From "rides named" to "see the fall comparison" takes the user at most 2 minutes.
+- **SC-001**: In the comparison, both clips stay in sync within one frame over 30 s of playback
+  at 1x and 0.25x, and the skeletons keep up at 1x on the laptop.
+- **SC-002**: With at least 10 starred rides over 2 sessions, the median starred ride ranks in the
+  top 25% of its session by score (held-out session included in the report, not in fitting).
+- **SC-003**: Importing a 60 s reference clip to "ready to compare" takes at most 3 minutes.
+- **SC-004**: Analysing a session's named-rider rides takes at most 10 minutes per hour of footage
+  with about 30 such rides.
+- **SC-005**: From picking two clips to watching them synced takes the user at most 1 minute.
 
 ## Future directions (not in this feature)
 
-- Compare different surfers on the same trick: tagged tricks of two named riders side by side,
-  synchronised on the trick moment, with their compression and body-proportion curves overlaid.
-  Builds on FR-008 tags and works for any rider the user names (FR-010).
 - Automatic trick recognition, trained on the user's trick tags.
+- Automatic sync on matching movement (aligning two turns by their compression curves).
+- Fall comparison and session trends (dropped from this feature 2026-10-17).
 
 ## Assumptions
 
-- Evaluation labels: the user marks turns and endings on at least 10 of their rides (about 5
-  minutes per ride) before thresholds are tuned; one session is held out from tuning.
-- One camera per session; no multi-camera 3D.
-- "Pump" = a compress/extend cycle without a direction change; "turn" = a direction change
-  across the wave, usually with a compression; definitions are refined with the user's labels.
+- References are for the user's own study; imported clips stay on the laptop.
+- One camera per clip; no multi-camera 3D.
 - Trick names are free text; no fixed list.
-- Body data (keypoints) stays in the session folder like other session data; it is about named
-  riders only.
+- Body data (keypoints) stays in the session or reference folder; only named riders and
+  references are analysed.

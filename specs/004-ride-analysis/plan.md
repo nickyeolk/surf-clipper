@@ -1,96 +1,90 @@
 # Implementation Plan: Ride Analysis
 
-**Branch**: `004-ride-analysis` | **Date**: 2026-10-17 | **Spec**: [spec.md](spec.md)
-
-**Input**: Feature specification from `/specs/004-ride-analysis/spec.md`
+**Branch**: `004-ride-analysis` | **Date**: 2026-10-17 (rescoped) | **Spec**: [spec.md](spec.md)
 
 ## Summary
 
-A new cached **analysis** stage runs after `riders`, only for rides of named riders. For each
-ride it decodes the full-resolution source at 15 fps, crops the tracked rider (001 track boxes,
-interpolated), runs YOLO11-pose on the crop and keeps the keypoints of the person nearest the
-crop centre (spike: 99-100% joint visibility at 85-360 px). From the keypoints and the rider's
-path across the pool (001 zone mapping) it derives, per ride: a **compression signal** relative
-to the rider's own body, **turns** (direction changes across the wave, usually with a
-compression), **pumps** (compress/extend cycles without a direction change), **trimming**
-(neither), **unclear** spans, and the **ending** (fall / exit / unclear). User corrections
-(ending, turn add/remove) and **trick tags** are append-only edits, as in 001/002.
+A cached **analysis** stage (built) runs pose on full-resolution crops of named riders' rides and
+derives body-relative signals: compression, lean, arm spread, stance width, turns and the ending.
+On top of it:
 
-The Review player gets a skeleton overlay and an analysis strip (compression curve with turns,
-pumps, ending, tags). A per-session **Analysis** screen shows the ride table, the
-turning/pumping/trimming shares and the **fall comparison** (with back-to-back playback of
-pre-fall moments); a **Trends** screen pools sessions by the user-given rider name. A **ride
-marks** screen lets the user mark turns and endings for evaluation before tuning.
+1. **Comparison** (P1): a screen with two players, each showing the review copy cropped to its
+   surfer (crop follows the analysed box), skeleton overlay, mirror toggle, a sync point per
+   clip, shared transport (play, 0.25-1x, frame step) and the four measure curves of both on one
+   time axis aligned at the sync points. Sync can snap to a detected turn or a trick tag.
+2. **Reference clips** (P1): a video imported from the footage folder becomes a session of kind
+   `reference`: probe, review copy, detect and track as usual (no zone, rides or riders); the user
+   clicks the surfer on a frame, the clicked track becomes the clip's single "ride", and the same
+   analysis runs on it.
+3. **Score** (P2): per analysed ride, a weighted sum of standardised features (length, clean
+   ending, compressions and their depth, rhythm regularity, tagged tricks), with weights fitted to
+   the user's stars (L2-regularised logistic regression, pooled over sessions; defaults below 5
+   stars), explained by its top contributions. Rides sortable by score; "compilation of these".
+4. **Trick tags** (P3): `trick_tag` edits; lists per session and across sessions; open in the
+   comparison with the tag as sync point.
+
+Stars and tags are append-only edits anchored to rides by span (constitution VI); stars are
+also the evaluation labels for the score (SC-002).
 
 ## Technical Context
 
 **Language/Version**: Python 3.12; TypeScript 5 + Svelte 5
 
-**Primary Dependencies**: as 001-003; pose weights `yolo11s-pose.pt` (or `m`/`x` if R2 says so)
-fetched by `surfclip models download`; no new packages (ultralytics, NumPy, SciPy, pyarrow)
+**Primary Dependencies**: as before; YOLO11s-pose (downloaded); no new packages (score fit in NumPy)
 
-**Storage**: per session `artifacts/<session>/analysis/<ride>.parquet` (keypoints: t, 17×(x, y,
-conf) in source pixels, crop box) and `analysis.json` (per-ride measures, events, summary; stage
-output); corrections and tags in `edits.json`; evaluation marks in
-`labels/analysis/<video>.json` (times only, no names: committed like ride labels)
+**Storage**: `artifacts/<session>/analysis/<ride>.parquet`, `analysis.json` (now with measure
+series, score parts); reference clips are sessions with `kind = "reference"` and
+`reference.json` (chosen track, time span); stars and tags in `edits.json`; score weights in
+`artifacts/score.json` (fitted, per user, not per session)
 
-**Testing**: pytest (unit: compression signal, turn/pump/trim segmentation, ending rules,
-edit application, trends pooling; contract: routes; integration: stage on a short synthetic
-or sample clip); `surfclip eval-analysis` for SC-001..003 per marked session, one session held out
+**Testing**: pytest (signals/measures invariance, score fit and explanation, reference track
+choice, edits); contract tests for routes; browser check of the comparison sync (SC-001);
+`surfclip eval-score` for SC-002 with one session held out
 
-**Target Platform**: as before (RTX 2060, WSL2, Chromium)
+**Performance Goals**: ≤ 20 s per ride (measured 6 s); reference import ≤ 3 min for 60 s;
+comparison playback in sync within one frame
 
-**Performance Goals**: ≤ 20 s per ride (SC-004: 30 rides ≤ 10 min); overlay at 1x (SC-005)
-
-**Constraints**: measures relative to the body, never pixels or absolute angles (FR-002); named
-riders only (FR-010); keypoints stay in the session folder; cross-session pooling only by the
-user-given name, never by appearance (constitution I, 002)
-
-**Scale/Scope**: ~30 analysed rides per session, ~600 frames per ride
+**Constraints**: body-relative measures (FR-002); named riders and references only (FR-011);
+imported clips read-only from the footage folder; no network
 
 ## Constitution Check
 
 | # | Principle | How this plan complies | Status |
 | --- | --- | --- | --- |
-| I | Local-first and personal | Pose runs locally; only named riders analysed; keypoints in the session folder; trends link sessions only by the user's own naming | Pass |
-| II | Evaluation before features | Ride-marks screen and `eval-analysis` come first; thresholds tuned on marked rides, one session held out; the compression measure is chosen by the marks (R3) | Pass |
-| III | Scale-, perspective-, mirror-invariant | All measures are body-relative ratios; direction changes use pool coordinates; left/right turns treated alike | Pass |
-| IV | Assume the camera moves | Handheld follow-cam supported: body ratios are zoom-invariant; pool-coordinate movement is used only when the session has a confirmed zone and no camera motion in that span (epochs), else turns come from compression + image motion of the rider relative to the wave | Pass |
-| V | Confirm late, start early | Ending is decided from the whole ride end, not the first dip | Pass |
-| VI | Human corrections are ground truth | Ending/turn corrections and trick tags are append-only edits re-attached by ride span | Pass |
-| VII | Staged, cached pipeline | `analysis` stage, cache per ride (span + rider + settings + code version) | Pass |
-| VIII | Simple first | Rules on two signals (compression, lateral motion); no learned classifier; trick detection deferred | Pass |
-| IX | Config, not constants | `[analysis_pose]` section (rate, model, smoothing, thresholds) | Pass |
-| X | Engineering standards | Library `surfclip/analysis/`, CLI, thin API, UI without analysis logic | Pass |
-| XI | Scope discipline | No absolute angles, no 3D, no trick recognition, no cross-surfer comparison (future) | Pass |
+| I | Local-first and personal | Pose local; only named riders and user-imported references analysed; score pools only the user's own starred rides by their naming | Pass |
+| II | Evaluation before features | Score evaluated on stars (SC-002, held-out session); comparison sync measured in the browser (SC-001); turn detection is a helper (snap), not a reported metric | Pass |
+| III | Scale-, perspective-, mirror-invariant | Body ratios; mirror toggle for stance/direction; lean labelled camera-relative | Pass |
+| IV | Assume the camera moves | Crops follow the surfer per frame; handheld clips supported | Pass |
+| V | Confirm late, start early | Not applicable | Pass |
+| VI | Human corrections are ground truth | Stars and tags are edits; stars override nothing but steer the score | Pass |
+| VII | Staged, cached pipeline | Reference clips reuse probe/review/detect/track stages; analysis cached per ride | Pass |
+| VIII | Simple first | CSS crop + canvas overlay; logistic regression on 7 features; manual sync points | Pass |
+| IX | Config, not constants | `[analysis_pose]` and `[score]` sections | Pass |
+| X | Engineering standards | Library + CLI + thin API; UI renders only | Pass |
+| XI | Scope discipline | No trick recognition, no auto-sync, no trends/fall comparison | Pass |
 
 ## Project Structure
 
 ```text
-specs/004-ride-analysis/
-├── plan.md  research.md  data-model.md  quickstart.md  tasks.md
-├── contracts/{http-api.md, session-files.md, cli.md}
-└── checklists/requirements.md
-
-config/default.toml                  # + [analysis_pose]
 src/surfclip/analysis/
-├── pose.py         # decode ride, crop, YOLO-pose, keypoints parquet
-├── signals.py      # compression signal, lateral motion, unclear spans
-├── events.py       # turns, pumps, trimming, ending
-├── summary.py      # per-ride measures, fall comparison, session shares, trends
-├── marks.py        # evaluation marks (labels/analysis) and eval-analysis
-└── service.py      # analysis stage: which rides, cache, apply corrections
-src/surfclip/stages.py               # AnalysisStage after riders
-src/surfclip/store/schemas.py        # RideAnalysis, AnalysisFile, new EditOps
-src/surfclip/api/app.py              # analysis, keypoints, marks, tags, trends routes
-src/surfclip/cli.py                  # analyse, eval-analysis
-web/src/lib/Skeleton.svelte          # overlay canvas on the review video
-web/src/lib/AnalysisStrip.svelte     # compression curve + events under the player
-web/src/routes/Marks.svelte          # #/marks/<id>: mark turns and endings
-web/src/routes/Analysis.svelte       # #/analysis/<id>: rides, shares, fall comparison, tricks
-web/src/routes/Trends.svelte         # #/trends/<name>
-tests/unit/test_analysis_*.py, tests/contract/test_api_analysis.py
+├── pose.py       # keypoints (built)
+├── signals.py    # compression (built) + lean, arm spread, stance width
+├── events.py     # turns, pumps, ending (built)
+├── score.py      # features, fit to stars, explanation
+├── reference.py  # reference clips: track at a click, the clip's ride
+└── service.py    # analysis stage (built) + edits (stars, tags) applied on read
+src/surfclip/api/app.py   # analysis, keypoints, references, stars, tags, score routes
+src/surfclip/cli.py       # analyse-rides (built), reference add/pick, eval-score
+web/src/lib/Skeleton.svelte      # canvas overlay (crop-aware, mirror)
+web/src/lib/CropPlayer.svelte    # review video cropped to the surfer + skeleton
+web/src/routes/Compare.svelte    # #/compare?a=<sid>:<ride>&b=<sid>:<ride>
+web/src/routes/Best.svelte       # #/best/<sid>: rides by score, stars, compilation
+web/src/routes/Tricks.svelte     # #/tricks: tags across sessions
+web/src/routes/Sessions.svelte   # References section, import a clip
 ```
+
+Removed in the rescope: the Marks screen and `labels/analysis` (turn marking), fall comparison,
+trends.
 
 ## Complexity Tracking
 
