@@ -184,6 +184,7 @@
     pb?.pause()
     playing = false
     pa?.seek(a.sync - 1)
+    follow()
   }
   function toggle() {
     if (!pa || !pb) return
@@ -194,6 +195,7 @@
     } else {
       pa.setRate(rate)
       pb.setRate(rate)
+      follow()
       pa.play()
       pb.play()
       playing = true
@@ -205,11 +207,35 @@
     pb?.setRate(r)
   }
   function step(frames: number) {
+    jump(frames / 30)
+  }
+  /** Put B at the moment matching A (when linked). */
+  function follow() {
+    if (linked && pa && pb && a.sync !== null && b.sync !== null) pb.seek(b.sync + (pa.time() - a.sync))
+  }
+  function jump(seconds: number) {
     if (!pa) return
     pa.pause()
     pb?.pause()
     playing = false
-    pa.seek(pa.time() + frames / 30)
+    pa.seek(pa.time() + seconds)
+    follow()
+  }
+  /** Seconds from the linked moment covered by both rides together (for the shared scrubber). */
+  const linkedRange = $derived.by((): [number, number] => {
+    if (!rideA || !rideB || a.sync === null || b.sync === null) return [0, 0]
+    return [
+      Math.min(rideA.span[0] - a.sync, rideB.span[0] - b.sync) - 1,
+      Math.max(rideA.span[1] - a.sync, rideB.span[1] - b.sync) + 1,
+    ]
+  })
+  function scrubLinked(rel: number) {
+    if (!pa || a.sync === null) return
+    pa.pause()
+    pb?.pause()
+    playing = false
+    pa.seek(a.sync + rel)
+    follow()
   }
   // when linked, B follows A
   $effect(() => {
@@ -240,6 +266,8 @@
     const tag = (e.target as HTMLElement).tagName
     if (tag === 'INPUT' || tag === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey || !linked) return
     if (e.key === ' ') toggle()
+    else if (e.key === 'ArrowLeft' && e.shiftKey) jump(-1)
+    else if (e.key === 'ArrowRight' && e.shiftKey) jump(1)
     else if (e.key === ',' || e.key === 'ArrowLeft') step(-1)
     else if (e.key === '.' || e.key === 'ArrowRight') step(1)
     else return
@@ -389,14 +417,19 @@
           <span class="small muted">A {clock(ta)} ↔ B {clock(tb)}</span>
         {:else}
           <button onclick={toSync} title="Both to 1 s before the linked moment">⇤ linked moment</button>
+          <button onclick={() => jump(-1)} title="Both back 1 s (Shift+←)">−1s</button>
           <button onclick={() => step(-1)} title="One frame back (, or ←)">◀︎ frame</button>
           <button class="primary" onclick={toggle} title="Play/pause both (Space)">{playing ? 'Pause' : 'Play both'}</button>
           <button onclick={() => step(1)} title="One frame on (. or →)">frame ▶︎</button>
+          <button onclick={() => jump(1)} title="Both forward 1 s (Shift+→)">+1s</button>
           {#each [0.25, 0.5, 1] as r}
             <button class:active={rate === r} onclick={() => setRate(r)}>{r}×</button>
           {/each}
           <span class="small muted">{(ta - syncA >= 0 ? '+' : '')}{(ta - syncA).toFixed(2)} s from the linked moment</span>
           <button class="secondary" onclick={unlink} title="Adjust each side again">unlink to adjust</button>
+          <input class="scrub" type="range" min={linkedRange[0]} max={linkedRange[1]} step="0.033"
+            value={ta - (a.sync ?? 0)} oninput={(e) => scrubLinked(Number(e.currentTarget.value))}
+            title="Scrub both together (0 = the linked moment)" />
         {/if}
       </div>
     {/if}
