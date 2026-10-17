@@ -186,3 +186,42 @@ def apply_scores(result: AnalysisFile, artifacts: Path, cfg: ScoreConfig) -> Ana
             "rides": [a.model_copy(update={"score": score_ride(a, model)}) for a in result.rides]
         }
     )
+
+
+class SessionEval(BaseModel):
+    session_id: str
+    starred: int
+    rides: int
+    median_rank_pct: float | None  # 0 = top of the session; SC-002 wants <= 25
+    fitted: bool
+
+
+def evaluate(artifacts: Path, cfg: ScoreConfig) -> list[SessionEval]:
+    """SC-002, leaving each session out of the fit: where do its starred rides rank?"""
+    from surfclip.analysis.service import read_analysis, with_user_edits
+
+    by_session: dict[str, list[RideAnalysis]] = {}
+    for f in sorted(artifacts.glob("*/analysis.json")):
+        session = Session.model_validate_json(
+            f.with_name("session.json").read_text(encoding="utf-8")
+        )
+        if session.kind == "reference":
+            continue
+        store = SessionStore(f.parent, session)
+        result = read_analysis(store)
+        if result is not None:
+            by_session[session.session_id] = with_user_edits(store, result).rides
+    out: list[SessionEval] = []
+    for sid, rides in by_session.items():
+        starred = [r for r in rides if r.starred]
+        if not starred:
+            continue
+        others = [(features(r), r.starred) for s, rs in by_session.items() if s != sid for r in rs]
+        model = build_model(others, cfg, "held-out")
+        order = sorted(rides, key=lambda r: -score_ride(r, model).value)
+        ranks = [100 * order.index(r) / max(len(order) - 1, 1) for r in starred]
+        out.append(SessionEval(
+            session_id=sid, starred=len(starred), rides=len(rides),
+            median_rank_pct=round(float(np.median(ranks)), 1), fitted=model.fitted,
+        ))  # fmt: skip
+    return out

@@ -315,6 +315,30 @@ def analyse_rides(
         )
 
 
+@app.command("eval-score")
+def eval_score(
+    artifacts: ArtifactsOpt = Path("artifacts"),
+    config: ConfigOpt = DEFAULT_CONFIG_PATH,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """SC-002: where starred rides rank in their session (each session left out of the fit)."""
+    from surfclip.analysis.score import evaluate
+
+    results = evaluate(artifacts, load_config(config).score)
+    if as_json:
+        typer.echo(json.dumps([r.model_dump() for r in results], indent=2))
+        return
+    if not results:
+        typer.echo("no starred rides yet: star rides you love on the Best page")
+        return
+    for r in results:
+        verdict = "pass" if r.median_rank_pct is not None and r.median_rank_pct <= 25 else "fail"
+        typer.echo(
+            f"  {r.session_id}  {r.starred:2d} starred of {r.rides:3d}  median rank "
+            f"{r.median_rank_pct}%  ({'fitted' if r.fitted else 'default weights'})  {verdict}"
+        )
+
+
 @app.command()
 def still(
     video: Path,
